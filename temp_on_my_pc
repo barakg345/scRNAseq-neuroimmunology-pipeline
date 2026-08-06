@@ -1,0 +1,3522 @@
+```{r setup, include=FALSE}
+
+knitr::opts_knit$set(root.dir = "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/")
+knitr::opts_chunk$set(
+  fig.width = 13,    # Set the width of the plots in inches
+  fig.height = 10,   # Set the height of the plots in inches
+  dpi = 300,        # Set the resolution to 300 dpi
+  echo = FALSE       # Do not display the code
+
+)
+
+```
+
+```{r, "libraries and signatures", echo=FALSE}
+
+
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(Seurat)   
+  library(data.table)
+  library(cowplot)
+  library(ggplot2)
+  library(scran)
+  library(celldex)
+  library(SingleR)
+  library(tidyr)
+  library(scales)
+  library(corrplot)
+  library(magrittr)
+  library(dittoSeq)
+  library(viridis)
+  library(grid)
+  library(magrittr)
+  library(ggrepel)
+  library(glmGamPoi)
+  library(qs)
+  library(patchwork)
+  library(RColorBrewer)
+  library(Matrix)
+  library(parallel)
+  library(future)
+  library(future.apply)
+  # library(GEOquery)
+  library(harmony)
+  library(ggprism)
+  library(scCustomize)
+  library(UCell)
+  library(colorspace)
+  # library(SignatuR)
+  library(SCPA)
+  library(msigdbr)
+  library(ComplexHeatmap)
+  library(tidyverse)
+  library(ggpubr)
+  library(purrr)
+  library(knitr)
+  # library(clusterProfiler)
+  library(enrichplot)
+  # library(org.Hs.eg.db)
+  library(reshape2)
+  library(knitr)
+  # library(scGate)
+  # library(scater)
+  # library(biomaRt)
+  library(readxl)
+  library(writexl)
+
+
+})
+
+
+#Prepare the sub-cell types signatures for the upcoming analyses
+
+signatures <- list(
+  classical_monocytes = c("CD14", "CCR2", "FCGR1A", "CD36", "SELL"),
+  intermediate_monocytes = c("CD14", "FCGR3A", "FCGR3B", "HLA-DRA", "HLA-DRB3", "HLA-DRB5", "HLA-DRB1", "CCR5", "CD86", "ITGAX", "CD74"),
+  non_classical_monocytes = c("FCGR3A", "FCGR3B", "CX3CR1","CXCR4", "HLA-DRA", "HLA-DRB3", "HLA-DRB5", "HLA-DRB1", "SECISBP2L"),
+  
+  CD56_bright_nk = c("NCAM1", "CCR7", "CSF2", "CXCR3", "IFNG","IL2RB", "IL7R", "KIT", "KLRC1", "KLRD1", "NCR1", "SELL"),
+  CD56_dim_nk = c("FCGR3A", "FCGR3B", "NCAM1", "CX3CR1", "CXCR1", "ITGB2", "KIR2DL1", "KIR3DL1", "KIR2DL3", "KIR2DL2",  "KLRC2", "KLRG1", "PRF1"),
+  Adaptive_NK = c("B3GAT1", "KLRC2", "LILRB1", "Klra8"),
+  
+
+  naive_b_cells = c("CD19", "IGHD", "CD38", "CD24", "CR2", "IGHM", "FCER2"),
+  non_switched_memory_b_cells = c("IGHD", "CD27", "CD38", "CD24", "CR2", "IGHM", "CD1c"),
+  exhausted_b_cells = c("CD19", "CD38", "CD24", "ITGAX", "TBX21", "FcRL4", "FcRL5"),
+  switched_memory_b_cells = c("CD27", "CD38", "CD24", "CR2", "IGHG1", "IGHG2","IGHG3", "IGHG4", "IGHA1", "IGHA2", "FAS"),
+  Plasmablasts=c("CD19", "IGHD", "CD27", "CD38", "MS4A1", "HLA-DRA", "HLA-DRB3", "HLA-DRB5", "HLA-DRB1"),
+  
+  follicular_helper_t_cells = c("CXCR5", "PDCD1", "BCL6", "ICOS", "SH2D1A", "CD40LG", "IL21", "IL10", "B3GAT1"),
+  regulatory_tcell = c("IL2RA", "FOXP3", "IL7R", "ICOS", "TNFRSF18", "CTLA4", "TIGIT", "ENTPD1", "TNFRSF9", "TNFRSF1B"),
+  th1 = c("TBX21", "STAT4", "IFNG", "IL12RB1", "IL12RB2", "CXCR3", "CCR5", "CD44", "Fas", "	IFNGR1", "HAVCR2"),
+  th17 = c("IL17A", "IL17F", "IL21", "IL22", "KLRB1", "CCR4", "CCR6", "APOD", "C1QL1", "CTSL"),
+  th2 = c("GATA3", "STAT6", "IL4", "IL5", "IL13", "CCR4", "CCR8"),
+  naive_cd4_t_cells=c("LCK", "ZAP70", "KLF2", "CD3G", "CD3D", "CD3GE", "CD28", "SELL", "PTPRC", "CD5", "CCR7", "CD27", "IL7R"),
+  terminal_effector_cd4_t_cells= c("PTPRC", "CD44", "SELL", "IL2RB", "IL2RA", "IL2RG"),
+  
+
+  naive_cd8_t_cells = c("CD27", "CD28", "PTPRC", "SELL", "CCR7", "IL7R", "CD5", "CD8A", "CD8B", "CXCR3"),
+  central_memory_cd8_t_cells = c("SELL", "CCR7", "IL7R", "CD27", "EOMES", "HNF1A", "BCL6", "ID3", "STAT3"),
+  effector_memory_cd8_t_cells = c("SELL", "CCR7", "KLRG1", "	GZMB", "TBX21", "Blimp1", "ID2", "STAT4", "ITGAE", "ITGA1", "CXCR3"),
+  terminal_effector_cd8_t_cells = c("KLRG1", "IL7R", "B3GAT1", "CXCR3", "CD27", "CD28", "IFNG", "IL2", "CDKN1B")
+)
+
+
+```
+
+```{r, "Functions for analysis"}
+
+
+
+
+#Functions for analysis
+{
+
+
+get_singler_main <- function(seu){
+    
+    bped <- celldex::BlueprintEncodeData()
+    
+    DefaultAssay(seu) <- "SCT"
+  pred_main <- as.SingleCellExperiment(seu) %>%
+    SingleR(ref = bped, labels = bped$label.main)
+  
+  
+    seu$SingleR.labels <- pred_main$labels
+    cat(paste0("\033[31m","\nSummarize of SingleR annotation table\n"))
+    print(table(seu$SingleR.labels))
+    return(seu)
+    
+ 
+  }
+  
+get_singler_fine <- function(seu){
+    
+    monaco <- celldex::MonacoImmuneData()
+    
+    DefaultAssay(seu) <- "SCT"
+  pred_fine <- as.SingleCellExperiment(seu) %>%
+    SingleR(ref = monaco, labels = monaco$label.fine)
+    
+    
+    seu$SingleR_sub_labels <- pred_fine$labels
+    cat(paste0("\033[31m","\nSummarize of SingleR annotation table\n"))
+    # print(table(seu$SingleR_sub_labels))    
+    return(seu)
+    
+ 
+  }
+  
+get_four_umap_basic <- function(seu,size) {
+  p_clusters <- dittoDimPlot(seu, "seurat_clusters", reduction.use = "umap", size = size) +
+    ggplot2::ggtitle(label = "UMAP by Seurat Clusters")
+  
+  p_sample <- dittoDimPlot(seu, "sample", reduction.use = "umap", size = size) +
+    ggplot2::ggtitle(label = "UMAP by sample")
+  
+  p_singler <- dittoDimPlot(seu, "SingleR.labels", reduction.use = "umap", size = size) +
+    ggplot2::ggtitle(label = "UMAP by SingleR Labels")
+  
+  p_condition <- dittoDimPlot(seu, "condition", reduction.use = "umap", size = size, opacity = 0.8) +
+    ggplot2::ggtitle(label = "UMAP by Sample")
+  
+  # Combine plots into one
+  p_final <- ((p_clusters + p_condition) / (p_singler + p_sample))
+  
+  # Return the combined plot invisibly to avoid printing in the function
+  invisible(p_final)
+}
+  
+
+  
+get_p_avg_expr_log2_same_seurat_object <- function(seu) {
+  Idents(seu) <- "orig.ident"
+  DefaultAssay(seu) <- "SCT"
+
+  avg_exp <- AverageExpression(seu, assays = "SCT", group.by = "orig.ident")
+  avg_exp <- as.data.frame(avg_exp)
+  
+  column_names <- colnames(avg_exp)
+
+#Creating new, eazy to work with columns
+{
+  {if (!(length(column_names) == 2)) {
+    stop("Error in the function 'get_p_avg_expr_log2': The number of unique original idents in the merged Seurat object isn't 2 as expected. Please change it accordingly")
+} else if (any(grepl("Healthy", column_names[1]))) {
+    avg_exp$SCT.patient <- avg_exp[[column_names[2]]]
+    avg_exp$SCT.control <- avg_exp[[column_names[1]]]
+} else if (any(grepl("Healthy", column_names[2]))) {
+    avg_exp$SCT.patient <- avg_exp[[column_names[1]]]
+    avg_exp$SCT.control <- avg_exp[[column_names[2]]]
+}
+  else {
+    # If patient identifier is not found in either column name
+    stop("Error in the function 'get_p_avg_expr_log2': patient_orig_ident was not found in any of the original idents. Please make sure to call the function with the correct patient_orig_ident.")
+}
+}
+
+#Remove the original columns
+avg_exp[[column_names[1]]] <- NULL
+avg_exp[[column_names[2]]] <- NULL
+  
+}
+
+  # Making sure the columns are numeric and making it ready for log
+  avg_exp$SCT.control <- as.numeric(as.character(avg_exp$SCT.control))
+  avg_exp$SCT.patient <- as.numeric(as.character(avg_exp$SCT.patient))
+
+  avg_exp$SCT.control <- avg_exp$SCT.control + 1
+  avg_exp$SCT.patient <- avg_exp$SCT.patient + 1
+
+  line_data <- data.frame(x = range(avg_exp$SCT.control, avg_exp$SCT.patient, na.rm = TRUE))
+  line_data$y <- line_data$x  # displaying the line y = x
+  avg_exp <- avg_exp %>% tibble::rownames_to_column("gene")
+
+gene_to_be_displayed <- avg_exp %>%
+    filter(SCT.patient >= 1.5,
+           SCT.patient >= SCT.control,
+           SCT.patient > 2,
+           SCT.control > 2) %>% pull(gene)
+  
+  
+weird_genes <- avg_exp %>%
+    filter(SCT.patient >= SCT.control,
+          SCT.control <1.1,
+          SCT.patient > 1.35
+           ) %>% pull(gene)
+
+
+housekeeping_genes <- c("B2M", "H3F3A", "MALAT1", "YBX1", "UBA52", 
+                        "PSMB9", "ATP5E", "ATP5L", "UQCR11", "TOMM7")
+    
+# Filter genes for labeling
+
+label_genes <- avg_exp %>%
+    filter(gene %in% gene_to_be_displayed,
+            !(gene %in% housekeeping_genes),
+           !grepl("^MT", gene),
+           !grepl("^RP", gene),
+          (SCT.patient - SCT.control) >= 0.5)
+
+  mt_genes <- (length(grep("^MT", gene_to_be_displayed)) / length(gene_to_be_displayed)) * 100
+  ribo_genes <- (length(grep("^RP", gene_to_be_displayed)) / length(gene_to_be_displayed)) * 100
+
+condition_name <- sub("-Mevorach$", "", unique(seu@meta.data$orig.ident))
+
+plot_title <- paste0("Healthy Control (from ",unique(seu@meta.data$orig.ident),") vs ",condition_name," Patient Averaged Expression Levels")
+
+
+p_avg_mon <- ggplot(avg_exp, aes(x = SCT.control, y = SCT.patient)) +
+    geom_point(aes(color = ifelse(gene %in% gene_to_be_displayed, "significant", "non-significant"))) +
+    geom_line(data = line_data, aes(x = x, y = y), color = "blue") +
+    scale_x_continuous(trans = scales::log2_trans()) +  # Log2 scale for x-axis
+    scale_y_continuous(trans = scales::log2_trans()) +  # Log2 scale for y-axis
+    scale_color_manual(values = c("significant" = "red", "non-significant" = "black")) +
+    labs(x = "Log2(Control)", y = "Log2(Patient)",
+         title = plot_title) +
+    theme_minimal() +
+    guides(color = guide_legend(title = NULL)) +  # Remove legend title
+    annotate("text", x = 0, y = Inf, label = sprintf("Percent of ribo_genes: %.2f%%", ribo_genes), 
+             hjust = -0.1, vjust = 2.1, size = 5, color = "blue") +
+    annotate("text", x = 0, y = Inf, label = sprintf("Percent of mt_genes: %.2f%%", mt_genes), 
+             hjust = -0.1, vjust = 4.1, size = 5, color = "blue") +
+    geom_text_repel(data = label_genes, aes(x = SCT.control, y = SCT.patient, label = gene),
+                    size = 3, max.overlaps = Inf)  # Adding gene labels without overlap
+
+  
+print(p_avg_mon)
+  
+output_list <- list()
+output_list$plot <- p_avg_mon
+output_list$de_genes <- gene_to_be_displayed
+output_list$artificat <- weird_genes
+output_list$plot_title <- plot_title
+
+  # Return the plot invisibly to avoid printing
+  return(output_list)
+}
+
+
+    
+convert_to_msigdbr_format <- function(pathway_name,db) {
+  paste0(db,"_", gsub(" ", "_", toupper(pathway_name)))
+}
+
+
+get_volcano <- function(de_results, key_genes, plottitle, group_a, group_b) {
+  
+  # Load necessary libraries and source the custom theme
+  {
+    suppressPackageStartupMessages(library(tidyverse))
+    suppressPackageStartupMessages(library(gridExtra))
+    suppressPackageStartupMessages(library(ggrepel))
+    source('ggplot_theme_Publication-2.R')
+  } 
+  
+  # Calculate the maximum absolute value on the x-axis to determine symmetric limits
+  max_x_value <- max(abs(de_results$avg_log2FC))
+  
+  # Create the color mapping dynamically
+  color_values <- c(
+    group_a = "#00B0BA",
+    group_b = "#f87f01",
+    "Other" = "#cccccc"
+  )
+  names(color_values)[1] <- group_a
+  names(color_values)[2] <- group_b
+  
+  # Create the volcano plot
+  p_mon <- ggplot(de_results, aes(x = avg_log2FC, y = y_display, color = color_group)) +
+    geom_point() +
+    geom_text_repel(data = de_results %>% filter(gene %in% key_genes),
+                    aes(label = gene, color = color_group),  
+                    point.padding = 5,  #  point padding
+                    nudge_y = 0.5,  # Slightly nudge the text labels up
+                    max.overlaps = Inf,  # Allow infinite overlaps for key genes
+                    size = 4  # Set a fixed size for all gene labels
+    ) +
+    scale_x_continuous(limits = c(-max_x_value - 1, max_x_value + 1)) +  # Expanding x-axis limits
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.2))) +  # Expanding y-axis on both ends
+    geom_hline(yintercept = 1.30, linetype = "dashed", color = "blue", size = 1) +
+    geom_vline(xintercept = -1, linetype = "dashed", color = "blue", size = 1) +
+    geom_vline(xintercept = 1, linetype = "dashed", color = "blue", size = 1) +
+    labs(title = plottitle,
+         x = "Log2 Fold Change",
+         y = "-Log10 Adjusted P-value",
+         size = "Percentage in Group 1",
+         color = "Gene Group") +
+    guides(size = guide_legend(title = "Percentage in Patient cells")) +
+    scale_color_manual(values = color_values,
+                       breaks = c(group_a, group_b, "Other")) +
+    theme_dark_blue() +
+    annotate("text", x = -Inf, y = -Inf, label = "The points were capped at 280 for display",
+             hjust = 0, vjust = -1, color = "white", size = 3.5)
+  
+  return(p_mon)
+}
+
+
+
+get_four_umaps_pathway <- function (pathway_name, de_results ,seu, threshold,db){
+  
+  full_db <- paste0("CP:",db)
+specific_pathway  <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = full_db) %>% filter(gs_name == convert_to_msigdbr_format(pathway_name,db))
+  
+key_genes <- list(
+  key_genes = de_results %>%
+    filter(gene %in% specific_pathway$human_gene_symbol) %>%
+    filter(abs(avg_log2FC) > threshold) %>%
+    pull(gene) %>%
+    unique())
+  
+seu <- AddModuleScore_UCell(seu, features = key_genes, name = NULL)      
+pathway_name <- paste('"',pathway_name,'"',"Pathway Key Genes Expression")
+
+#And finally, print it
+p_key_genes <- FeaturePlot_scCustom(seurat_object = seu, features = "key_genes")  + ggtitle(pathway_name) +
+  theme(plot.title = element_text(face = "plain", size = 12))
+
+#Creating the other regular 3 umaps and printing them all togther
+{
+    p_clusters <- dittoDimPlot(seu, "seurat_clusters", reduction.use = "umap") +
+    ggplot2::ggtitle(label = "UMAP by Seurat Clusters")
+  
+    p_condition <- dittoDimPlot(seu, "condition", reduction.use = "umap", opacity = 0.8) +
+    ggplot2::ggtitle(label = "UMAP by Sample")
+    
+    p_subcluster <- dittoDimPlot(seu,"adaptive_type", reduction.use = "umap", color.panel = brewer.pal(6, "Paired")) +
+      ggplot2::ggtitle(label = "UMAP by subtype and condition")
+  
+  
+  }
+
+p_umap_key_genes <- ((p_clusters | p_condition) / (p_key_genes | p_subcluster)) 
+  #Boxplot
+{
+  
+boxplot <- dittoBoxPlot(object = seu, var = "key_genes", group.by = "condition", main = pathway_name)
+
+  
+}
+
+  return(  list(p_umap_key_genes = p_umap_key_genes, key_genes = key_genes, boxplot = boxplot))
+  
+  
+
+}
+
+get_four_umaps_subclustring <- function(seu) {
+    
+      p_clusters <- dittoDimPlot(seu, "seurat_clusters", reduction.use = "umap") +
+    ggplot2::ggtitle(label = "UMAP by Seurat Clusters")
+  
+    p_condition <- dittoDimPlot(seu, "condition", reduction.use = "umap", opacity = 0.8) +
+    ggplot2::ggtitle(label = "UMAP by Sample")
+    
+p_subcluster <- dittoDimPlot(seu,"SingleR_sub_labels", reduction.use = "umap", color.panel = brewer.pal(9, "Set1")) +
+      ggplot2::ggtitle(label = "UMAP by SingleR sub cluster")
+  
+p_phase <- dittoDimPlot(seu,"Phase", reduction.use = "umap", ) +
+      ggplot2::ggtitle(label = "UMAP by Celly Cycle")
+
+p_4_umaps_sub_clustring <- ((p_clusters | p_condition) / (p_subcluster | p_phase)) 
+  
+return(p_4_umaps_sub_clustring)
+}
+
+get_scpa <- function(seu, fgroup1, fgroup1_population) {
+  #kegg
+  {
+    
+      pathways_kegg <- msigdbr("Homo sapiens", "C2", "CP:KEGG") %>%
+    format_pathways()
+  
+  results_kegg <- compare_seurat(seu,
+                               assay = "SCT",
+                               group1 = fgroup1, 
+                               group1_population = fgroup1_population,
+                               pathways = pathways_kegg,
+                               parallel = TRUE,
+                               cores = 4)   %>%
+    mutate(Pathway = gsub("^KEGG_", "", Pathway),    # remove "KEGG_MEDICUS" 
+           Pathway = tolower(Pathway),               # convert to lower case
+           Pathway = gsub("_", " ", Pathway),        # replace "_" with ""
+           Pathway = str_to_title(Pathway))          # Convert to title case
+  
+
+    
+  results_kegg <- results_kegg %>%
+    filter(FC > -0.3) %>%
+    arrange(desc(qval)) %>%
+    slice_head(n = 10)
+  
+    p_pathways_kegg <- ggdotchart(results_kegg, x = "Pathway", y = "FC",  title = "Pathway Analysis by KEGG",
+                               color = "adjPval",
+                               sorting = "descending",
+                               add = "segments",
+                               rotate = TRUE,
+                               dot.size = 10,
+                               gradient.cols = c("darkgreen", "grey"),
+                               font.label = list(color = "white", size = 9, vjust = 0.5),              
+                               ggtheme = theme_pubr(),
+                               ylab = FALSE) +
+    theme(legend.key.height = unit(1.5, "cm"),
+          legend.key.width = unit(1, "cm"),
+          legend.text = element_text(size = 8),
+          legend.title = element_text(size = 10),
+          plot.margin = margin(1, 1, 1, 1, "cm"))
+    
+  }
+  
+  #reactom
+  {
+        pathways_reactom <- msigdbr("Homo sapiens", "C2", "CP:REACTOME") %>%
+    format_pathways()
+  
+  results_reactom <- compare_seurat(seu,
+                               assay = "SCT",
+                               group1 = fgroup1, 
+                               group1_population = fgroup1_population,
+                               pathways = pathways_reactom,
+                               parallel = TRUE,
+                               cores = 4)   %>%
+    mutate(Pathway = gsub("^REACTOME_", "", Pathway),    # remove "REACTOME_" 
+           Pathway = tolower(Pathway),               # convert to lower case
+           Pathway = gsub("_", " ", Pathway),        # replace "_" with ""
+           Pathway = str_to_title(Pathway))          # convert to title case
+  
+  
+  
+  
+  results_reactom <- results_reactom %>%
+    filter(FC > -0.3) %>%
+    arrange(desc(qval)) %>%
+    slice_head(n = 10)
+  
+  
+    p_pathways_reactom <- ggdotchart(results_reactom, x = "Pathway", y = "FC", title = "Pathway Analysis by REACTOME",
+                               color = "adjPval",
+                               sorting = "descending",
+                               add = "segments",
+                               rotate = TRUE,
+                               dot.size = 10,
+                               gradient.cols = c("darkblue", "grey"),
+                               font.label = list(color = "white", size = 9, vjust = 0.5),              
+                               ggtheme = theme_pubr(),
+                               ylab = FALSE) +
+    theme(legend.key.height = unit(1.5, "cm"),
+          legend.key.width = unit(1, "cm"),
+          legend.text = element_text(size = 8),
+          legend.title = element_text(size = 10),
+          plot.margin = margin(1, 1, 1, 1, "cm"))
+  }
+
+
+  print("These are the kegg results:")
+  print(results_kegg)
+  print("These are the reactom results:")
+  print(results_reactom)
+
+    # Return a list with the two plots
+  result_list <- list(p_pathways_kegg = p_pathways_kegg,
+                      p_pathways_reactom = p_pathways_reactom,
+                      results_kegg = results_kegg,
+                      results_reactom = results_reactom)
+  
+  return(result_list)
+  
+
+  
+}
+
+get_nk_subtype <- function(seu) {
+  
+  library(BiocParallel)
+  rucket_reference <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/data_for_get_nk_subtype/seu_rueckert_refrence.qs")
+  
+  DefaultAssay(seu) <- "RNA"
+      
+  # SingleR
+  pred_fine <- as.SingleCellExperiment(seu) %>%
+    SingleR(ref = rucket_reference, 
+            labels = rucket_reference$type, 
+            assay.type.ref = "counts", 
+            assay.type.test = "counts",
+            de.method = "wilcox", 
+            BPPARAM = MulticoreParam(100))
+  
+  # Fine tuning + updating Seurat
+  {
+      adaptive_indices <- which(pred_fine$labels == "Adaptive" & pred_fine$delta.next < 0.11)
+  
+  # Reassign these cells to "Dim"
+  pred_fine$labels[adaptive_indices] <- "Dim"
+  
+  # If you've already stored these labels in your Seurat object:
+  seu$SingleR_NK_sub_labels <- pred_fine$labels
+    }
+
+  
+  print(plotDeltaDistribution(pred_fine, show = "delta.next"))
+  print(plotScoreHeatmap(pred_fine))
+
+    
+  table(seu$SingleR_NK_sub_labels)
+    
+  color_palette <- c("#E69F00", "#56B4E9", "#009E73", "#CC79A7")
+  print(dittoDimPlot(seu, var = "SingleR_NK_sub_labels", color.panel = color_palette))
+  
+  # My_dotplot
+  solarExtra = c("5"='#3361A5', "7"='#248AF3', "1"='#14B3FF', "8"='#88CEEF', "9"='#C1D5DC', "4"='#EAD397', "3"='#FDB31A',"2"= '#E42A2A', "6"='#A31D1D')
+  my_dotplot <- DotPlot(seu, 
+          features = c("GZMK", "XCL1", "IL7R", "TCF7", "GPR183",
+                       "GZMB", "PRF1", "CX3CR1", "CD7", "FCER1G", "KLRB1",
+                       "KLRC2", "CD3E", "PATL2", "ZBTB38"), 
+          group.by = "SingleR_NK_sub_labels", 
+          dot.min = 0.01) + 
+    scale_color_gradientn(colours = solarExtra) + 
+    theme(axis.text.x = element_text(angle = 45))
+  
+  print(my_dotplot)
+
+  my_dotplot <- DotPlot(seu, 
+          features = c("KLRC2", "FCGR3A", "B3GAT1", "KIR3DL1", 
+                       "FCER1G", "NCR1", "IFNG"), 
+          group.by = "SingleR_NK_sub_labels", 
+          dot.min = 0.01) + 
+    scale_color_gradientn(colours = solarExtra) + 
+    theme(axis.text.x = element_text(angle = 45))
+    print(my_dotplot)
+
+
+  return(seu)
+}
+
+
+get_percentage_barplot <- function(seu, groupby, data_name){
+  
+  title =paste("Distribution of NK cells subtypes across conditions in the",data_name,"data")
+  color_palette <- c("#E69F00", "#56B4E9", "#009E73",  "#CC79A7")
+
+  
+  # Create the dittoBarPlot and extract the plot and data
+plot_data <- dittoBarPlot(seu, "SingleR_NK_sub_labels", group.by = groupby, main = title,  color.panel = color_palette)
+
+data <- plot_data$data %>%
+  group_by(grouping) %>%
+  arrange(label) %>%
+  mutate(mid_y = case_when(
+    row_number() == 1 ~ 1 - (percent / 2),
+    row_number() == 2 ~ (1 - lag(percent)) - (percent / 2),
+    row_number() == 3 ~ (1 - lag(percent, 2) - lag(percent, 1)) - (percent / 2),
+    row_number() == 4 ~ (1 - lag(percent, 3) - lag(percent, 2)- lag(percent, 1)) - (percent / 2)    
+  ))
+
+
+# cumsum(percent) - 0.5 * percent
+plot_data <- plot_data + geom_text(data = data, aes(x = grouping, y = mid_y, label = sprintf("%.1f%%", percent * 100)), color = "white", size = 6, fontface = "bold")
+
+return (plot_data)
+  
+}
+
+
+
+get_update_nk_prcnt <- function(nk_prcnt,seu, sample, data) {
+  
+  
+# Column existence checks
+if (!(sample %in% unique(colnames(seu@meta.data)))) {
+  print(paste("Column", sample, "does not exist in the data frame."))
+  break
+} else if (!("condition" %in% unique(colnames(seu@meta.data)))) {
+  print("Column condition does not exist in the data frame.")
+  break
+} else {
+  # Get unique conditions
+  unique_samples <- unique(seu@meta.data[[sample]])
+  seu$temp <- seu@meta.data[[sample]]
+
+i=0
+  for (current_sample in unique_samples) {
+    # Filter seu_mevorach for the current condition
+    condition_data <- subset(seu, temp == current_sample)
+
+    # Get dataset and disease (which is the same as condition in this case)
+    dataset <- unique(condition_data$orig.ident)
+    disease <- unique(condition_data$condition)
+    
+    # Get the percentages from the 'data' table
+    dim_prcnt <- data %>% filter(label == "Dim" & grouping == current_sample) %>% pull(percent)
+    bright_prcnt <- data %>% filter(label == "Bright" & grouping == current_sample) %>% pull(percent)
+    adaptive_prcnt <- data %>% filter(label == "Adaptive" & grouping == current_sample) %>% pull(percent)
+    proliferating_prcnt <- data %>% filter(label == "Proliferating" & grouping == current_sample) %>% pull(percent)  
+    
+    # If no data is found, set percentages to 0
+    if (length(dim_prcnt) == 0) dim_prcnt <- 0
+    if (length(bright_prcnt) == 0) bright_prcnt <- 0
+    if (length(adaptive_prcnt) == 0) adaptive_prcnt <- 0
+    if (length(proliferating_prcnt) == 0) proliferating_prcnt <- 0
+    
+    # Create a new row
+    new_row <- data.frame(
+      sample = current_sample,
+      dataset = dataset,
+      disease = disease,
+      dim_prcnt = dim_prcnt,
+      bright_prcnt = bright_prcnt,
+      adaptive_prcnt = adaptive_prcnt,
+      proliferating_prcnt = proliferating_prcnt,  # Corrected spelling
+      stringsAsFactors = FALSE
+    )
+    
+    # Append the new row to nk_prcnt
+    nk_prcnt <- rbind(nk_prcnt, new_row)
+    i=i+1
+  }
+      print(paste("nk_prcnt get updated",i,"times")) 
+
+    return (nk_prcnt)
+
+}
+  
+
+
+}
+
+get_confusion_matrix <- function(seu_cd59, seu_cd55, method_column) {
+  
+#Checking that the method_column indeed exsists in each of the seurat objects
+    if (!(method_column %in% unique(colnames(seu_cd59@meta.data)))) {
+      print(paste("Column", method_column, "does not exist in the seu_cd59 data."))
+      break }
+      else if (!(method_column %in% unique(colnames(seu_cd55@meta.data)))) {
+      print(paste("Column", method_column, "does not exist in the seu_cd55 data."))
+      break } 
+      
+      
+ else {
+   
+    # Create a temp column that will hold the method_column variables
+    seu_cd59$temp <- seu_cd59@meta.data[[method_column]]
+    seu_cd55$temp <- seu_cd55@meta.data[[method_column]]
+    
+    # Calculate True Positives (TP), False Positives (FP), False Negatives (FN), True Negatives (TN)
+    tp <- sum(seu_cd59$temp == "NK cells" & seu_cd59$gold_standart == "NK cells") +
+          sum(seu_cd55$temp == "NK cells" & seu_cd55$gold_standart == "NK cells")
+    
+    fp <- sum(seu_cd59$temp == "NK cells" & seu_cd59$gold_standart != "NK cells") +
+          sum(seu_cd55$temp == "NK cells" & seu_cd55$gold_standart != "NK cells")
+    
+    fn <- sum(seu_cd59$temp != "NK cells" & seu_cd59$gold_standart == "NK cells") +
+          sum(seu_cd55$temp != "NK cells" & seu_cd55$gold_standart == "NK cells")
+    
+    tn <- sum(seu_cd59$temp != "NK cells" & seu_cd59$gold_standart != "NK cells") +
+          sum(seu_cd55$temp != "NK cells" & seu_cd55$gold_standart != "NK cells")
+    
+    precision <- tp / (tp + fp)
+    sensitivity <- tp / (tp + fn)
+    f1_score <- 2 * (precision * sensitivity) / (precision + sensitivity)
+    accuracy <- (tp + tn) / (tp + tn + fp + fn)
+    
+    # Create a matrix for the confusion matrix
+    confusion_matrix <- matrix(c(tp, fn, fp, tn), nrow = 2, byrow = TRUE,
+                               dimnames = list(
+                                 "Actual" = c("Actual Positive", "Actual Negative"),
+                                 "Predicted" = c("Predicted Positive", "Predicted Negative")
+                               ))
+    
+    # Create a data frame for the metrics
+    metrics <- data.frame(
+      Metric = c("Sensitivity", "Precision", "F1 Score", "Accuracy"),
+      Value = c(sensitivity, precision, f1_score, accuracy)
+    )
+    
+    # Combine the confusion matrix and metrics into a list
+    output <- list(
+      ConfusionMatrix = confusion_matrix,
+      Metrics = metrics
+    )
+    
+    # Return the output
+    return(output)
+      }
+
+}
+
+
+  get_method_umap <- function (seu_cd55, seu_cd59, method_column){
+    
+    #Checking that the method_column indeed exsists in each of the seurat objects
+    if (!(method_column %in% unique(colnames(seu_cd59@meta.data)))) {
+      print(paste("Column", method_column, "does not exist in the seu_cd59 data."))
+      break }
+      else if (!(method_column %in% unique(colnames(seu_cd55@meta.data)))) {
+      print(paste("Column", method_column, "does not exist in the seu_cd55 data."))
+      break } 
+      
+      
+ else {
+   
+  # Create a temp column that will hold the method_column variables
+  # (It's the only way to access it)
+  seu_cd59$temp <- seu_cd59@meta.data[[method_column]]
+  seu_cd55$temp <- seu_cd55@meta.data[[method_column]]
+  
+  size <- 0.8
+  
+  cd55_method_title <- paste("CD55 UMAP by",method_column)
+  cd59_method_title <- paste("CD59 UMAP by",method_column)
+
+  
+  
+      p_sample_cd55 <- dittoDimPlot(seu_cd55, "gold_standart", reduction.use = "umap", size = size) +
+    ggplot2::ggtitle(label = "CD55 UMAP by Gold standard")
+      
+            p_sample_cd59 <- dittoDimPlot(seu_cd59, "gold_standart", reduction.use = "umap", size = size) +
+    ggplot2::ggtitle(label = "CD59 UMAP by Gold standard")
+  
+  p_temp_cd55 <- dittoDimPlot(seu_cd55, "temp", reduction.use = "umap", size = size) +
+    ggplot2::ggtitle(label = cd55_method_title)
+  
+  p_temp_cd59 <- dittoDimPlot(seu_cd59, "temp", reduction.use = "umap", size = size) +
+    ggplot2::ggtitle(label = cd59_method_title)
+  
+    # Combine plots into one
+  p_final <- ((p_sample_cd55 + p_temp_cd55) / (p_sample_cd59 + p_temp_cd59))
+  
+ }
+  }
+  
+  
+
+  get_nk <- function(seu){
+  
+
+
+  seu <- FindClusters(seu, resolution = 80)
+  
+  #SingleR with Blueprint
+  {
+     singler_ref <- celldex::BlueprintEncodeData()
+
+
+singler_results <- SingleR(test = GetAssayData(seu, assay = "SCT"),
+                           ref = singler_ref,
+                           labels = singler_ref@colData@listData$label.main,
+                           clusters = seu@meta.data$SCT_snn_res.80
+)
+
+x <- data.frame(row.names = rownames(singler_results), labels = singler_results$labels)
+
+seu <- AddMetaData(seu, metadata = x[seu$SCT_snn_res.80, 1], col.name = "SingleR.labels.blueprint.cluster80")
+
+  }
+
+  #SingleR with Monaco
+  
+  {
+      singler_ref <- celldex::MonacoImmuneData()
+
+
+singler_results <- SingleR(test = GetAssayData(seu, assay = "SCT"),
+                           ref = singler_ref,
+                           labels = singler_ref@colData@listData$label.main,
+                           clusters = seu@meta.data$SCT_snn_res.80
+
+)
+
+x <- data.frame(row.names = rownames(singler_results), labels = singler_results$labels)
+
+seu <- AddMetaData(seu, metadata = x[seu$SCT_snn_res.80, 1], col.name = "SingleR.labels.monaco.cluster80")
+  }
+
+  #Ucell with Viver's NK Signature
+  
+  {
+      positive_nk_signature <- c("CD160+", "CD244+", "CHST12+", "CST7+", "GNLY+", "IL18RAP+", "IL2RB+", "KLRC1+", "KLRC3+", "KLRD1+", "KLRF1+", "PRF1+", "XCL2+")
+
+
+signatures <- list(
+  positive_nk_signature = positive_nk_signature)
+
+seu <- AddModuleScore_UCell(seu, features = signatures, name = NULL)
+
+seu$nk_by_ucell <- ifelse(seu$positive_nk_signature >= 0.4, "NK cells", "other")
+
+  }
+
+# Final idetification
+  
+seu$is_nk <- dplyr::case_when(
+  (seu$nk_by_ucell == "NK cells" & seu$SingleR.labels.blueprint.cluster80 == "NK cells") |
+  (seu$nk_by_ucell == "NK cells" & seu$SingleR.labels.monaco.cluster80 == "NK cells") |
+  (seu$SingleR.labels.blueprint.cluster80 == "NK cells" & seu$SingleR.labels.monaco.cluster80 == "NK cells") ~ "NK cells",
+  TRUE ~ "other"
+)
+
+    return(seu)
+  }
+  
+  
+  get_four_umap_4_idenfication_methods <- function(seu_list,size = 0.8)
+{
+  
+required_columns <- c("SingleR.labels.blueprint.cluster80", 
+                      "SingleR.labels.monaco.cluster80", 
+                      "nk_by_ucell", 
+                      "is_nk")
+
+# Initialize a list to collect missing column information
+missing_info <- list()
+
+# Iterate through the list of Seurat objects
+for (seu_name in names(list_seu)) {
+  # Get the Seurat object
+  seu <- list_seu[[seu_name]]
+  
+  # Check for missing columns in the Seurat object's metadata
+  missing_columns <- required_columns[!(required_columns %in% colnames(seu@meta.data))]
+  
+  # If any columns are missing, add this information to the missing_info list
+  if (length(missing_columns) > 0) {
+    missing_info[[seu_name]] <- missing_columns
+  }
+}
+
+# After checking all Seurat objects, decide whether to continue or break
+if (length(missing_info) > 0) {
+  # If there are any missing columns, print the details and break
+  for (seu_name in names(missing_info)) {
+    print(paste("The following columns are missing in", seu_name, "data:", 
+                paste(missing_info[[seu_name]], collapse = ", ")))
+  }
+  break
+} else {
+
+  plot_list = list()
+for (seu_name in names(list_seu)) {
+  # Get the Seurat object
+  seu <- list_seu[[seu_name]]
+  
+  title <- paste(seu_name, "SingleR.labels.blueprint.cluster80")
+  
+  p_bleuprint <- dittoDimPlot(seu, "SingleR.labels.blueprint.cluster80" , reduction.use = "umap", size = size) +
+  ggplot2::ggtitle(label = title)
+
+  title <- paste(seu_name, "SingleR.labels.monaco.cluster80")
+  
+p_monaco <- dittoDimPlot(seu, "SingleR.labels.monaco.cluster80", reduction.use = "umap", size = size) +
+  ggplot2::ggtitle(label = title)
+
+  title <- paste(seu_name, "Viver's positive signature")
+
+p_ucell <- dittoDimPlot(seu, "nk_by_ucell", reduction.use = "umap", size = size) +
+  ggplot2::ggtitle(label = title)
+
+  title <- paste(seu_name, "Final_confermation")
+
+p_is_nk <- dittoDimPlot(seu, "is_nk", reduction.use = "umap", size = size, opacity = 0.8) +
+  ggplot2::ggtitle(label = title)
+
+# Combine plots into one
+p_final <- ((p_bleuprint +  p_monaco) / (p_ucell + p_is_nk))
+
+plot_name <- paste0("plot_", seu_name)
+plot_list[[plot_name]] <- p_final
+}
+}
+
+return (plot_list)
+  }
+  
+  
+  get_confusion_matrix_solo <- function(seurat_object, method_column) {
+  
+  # Checking that the method_column indeed exists in the Seurat object
+  if (!(method_column %in% unique(colnames(seurat_object@meta.data)))) {
+    stop(paste("Column", method_column, "does not exist in the Seurat object."))
+  }
+  
+  # Create a temp column that will hold the method_column variables
+  seurat_object$temp <- seurat_object@meta.data[[method_column]]
+  
+  # Calculate True Positives (TP), False Positives (FP), False Negatives (FN), True Negatives (TN)
+  tp <- sum(seurat_object$temp == "NK cells" & seurat_object$gold_standart == "NK cells")
+  fp <- sum(seurat_object$temp == "NK cells" & seurat_object$gold_standart != "NK cells")
+  fn <- sum(seurat_object$temp != "NK cells" & seurat_object$gold_standart == "NK cells")
+  tn <- sum(seurat_object$temp != "NK cells" & seurat_object$gold_standart != "NK cells")
+  
+  # Calculate metrics
+  precision <- tp / (tp + fp)
+  sensitivity <- tp / (tp + fn)
+  f1_score <- 2 * (precision * sensitivity) / (precision + sensitivity)
+  accuracy <- (tp + tn) / (tp + tn + fp + fn)
+  
+  # Create a matrix for the confusion matrix
+  confusion_matrix <- matrix(c(tp, fn, fp, tn), nrow = 2, byrow = TRUE,
+                             dimnames = list(
+                               "Actual" = c("Actual Positive", "Actual Negative"),
+                               "Predicted" = c("Predicted Positive", "Predicted Negative")
+                             ))
+  
+  # Create a data frame for the metrics
+  metrics <- data.frame(
+    Metric = c("Sensitivity", "Precision", "F1 Score", "Accuracy"),
+    Value = c(sensitivity, precision, f1_score, accuracy)
+  )
+  
+  # Combine the confusion matrix and metrics into a list
+  output <- list(
+    ConfusionMatrix = confusion_matrix,
+    Metrics = metrics
+  )
+  
+  # Return the output
+  return(output)
+}
+
+}
+
+```
+
+```{r, "Load all the data and list it", eval=FALSE}
+
+# #Loading seurat objects that include healthy samples
+# relevant_datasets <- nk_prcnt %>%     filter(disease =="Healthy") %>% pull(dataset)
+
+#Healthy controls whose NKs were obtained computanitonally 
+{
+  seu_hong <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_hong.qs")
+  
+  seu_kang <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_kang.qs")
+  
+  seu_ramesh_5 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_ramesh_5.qs")
+  
+}
+
+#Loading Nks obtianed through FACS
+{
+  #Yang
+  seu_yang <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_yang.qs")
+  
+  #Witkowski
+  seu_witkowski_h6 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_witkowski_h6.qs")
+  seu_witkowski_h8 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_witkowski_h8.qs")
+  seu_witkowski_h21_h18_h2 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_witkowski_h21_h18_h2.qs")
+  
+  #Smith
+  seu_smith_NRHV193_NRHV187 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_smith_NRHV193_NRHV187.qs")
+  seu_smith_em <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_smith_em.qs")
+  
+  #Degagne
+  seu_degagne <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_degagne.qs")
+  
+  #Zhang
+  seu_zhang <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_zhang.qs")
+  
+}
+
+
+
+
+#List of all the Seurat objects
+list_seu <- list(
+  "seu_degagne" = seu_degagne,
+  "seu_smith_em" = seu_smith_em,
+  "seu_smith_NRHV193_NRHV187" = seu_smith_NRHV193_NRHV187,
+  "seu_witkowski_h6" = seu_witkowski_h6,
+  "seu_witkowski_h8" = seu_witkowski_h8,
+  "seu_witkowski_h21_h18_h2" = seu_witkowski_h21_h18_h2,
+  "seu_zhang" = seu_zhang,
+  "seu_yang" = seu_yang,
+  "seu_hong" = seu_hong,
+  "seu_kang" = seu_kang,
+  "seu_ramesh_5" = seu_ramesh_5)
+
+
+#List of all the Seurat objects
+# list_seu <- list(
+#   "seu_kang" = seu_kang)
+
+rm(seu_degagne,seu_smith_em,seu_smith_NRHV193_NRHV187,seu_witkowski_h6,seu_witkowski_h8,seu_witkowski_h21_h18_h2,seu_zhang,seu_yang,seu_hong,seu_kang,seu_ramesh_5)
+gc()
+
+```
+
+```{r, "Generate tables of housekeeping genes", eval=FALSE}
+
+
+
+#Generate a table with levanon_housekeeping_genes
+{
+#   gene_data <- read_excel("/bigdata/bgutman/Collabs/Dror mevorach/data/levanon_housekeeping_genes.xlsx", col_names = TRUE)
+#   
+#   
+# # Keep only unique rows
+# gene_data <- unique(gene_data)
+# 
+# # Save the updated data back to the same file
+# write_xlsx(gene_data, "/bigdata/bgutman/Collabs/Dror mevorach/data/levanon_housekeeping_genes.xlsx")  
+}
+
+
+
+
+
+#Generate a table with joshi_low_ gini_coefficients_genes in both genes format
+{
+#   # Read the file into R
+# gene_data <- read_excel("/bigdata/bgutman/Collabs/Dror mevorach/data/joshi_low_ gini_coefficients_genes.xlsx", col_names = FALSE)
+# colnames(gene_data) <- "EnsemblID"
+# gene_data <- gene_data[-1, ]  # Remove the first row
+# 
+# 
+# # Initialize the Ensembl BioMart
+# ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+# 
+# # Perform the mapping from Ensembl Gene IDs to HGNC symbols
+# mapped_genes <- getBM(
+#   attributes = c("ensembl_gene_id", "hgnc_symbol"),
+#   filters = "ensembl_gene_id",
+#   values = gene_data$EnsemblID,
+#   mart = ensembl
+# )
+# 
+# # Merge the original data with the mapped symbols
+# gene_data <- merge(gene_data, mapped_genes, by.x = "EnsemblID", by.y = "ensembl_gene_id", all.x = TRUE)
+# 
+# # Save the file
+# write_xlsx(gene_data, "/bigdata/bgutman/Collabs/Dror mevorach/data/joshi_low_gini_coefficients_genes.xlsx")
+
+}
+
+
+```
+
+
+```{r, "one_on_one function"}
+
+#The function does the one and one comparison between the two samples and calls other functions
+ 
+one_on_one <- function(seu_patient,seu_control,patient_type="patient",control_type="Healthy",patient_orig_ident ="Mevorach") {
+
+  #browser()
+#intial_check
+  {
+      
+#Checking that the method_column indeed exsists in each of the seurat objects
+    if (!("condition" %in% unique(colnames(seu_patient@meta.data)))) {
+      print(paste("The condition column does not exist in seu_patient"))
+      break }
+      else if (!("condition" %in% unique(colnames(seu_control@meta.data)))) {
+      print(paste("The condition column does not exist in seu_patient"))
+      break }
+
+      else if (!(control_type %in% unique(seu_control$condition))) {
+      print(paste("The condition", control_type,"does not exist in the seu_control"))
+      break }
+
+      else if (!(patient_type %in% unique(seu_patient$condition))) {
+      print(paste("The condition", patient_type,"does not exist in the seu_patient"))
+      break }
+      else if (!("sample" %in% unique(colnames(seu_control@meta.data)))) {
+      print("The sample column does not exist in  seu_control")
+      break }  
+      else if (!("sample" %in% unique(colnames(seu_patient@meta.data)))) {
+      print("The sample column does not exist in  seu_patient")
+      break }  
+    
+  }  
+  
+
+
+sample_output_list <- list()
+
+seu_control <- subset(seu_control,subset= condition == control_type)
+seu_patient <- subset(seu_patient,subset= condition == patient_type)
+
+#For each "healthy" sample in seu_control 
+for (control_sample in unique(seu_control$sample)) {
+  
+  #Subset to the that one healthy sample
+  seu_control_sample <- subset(seu_control,subset= sample == control_sample)
+  
+de_markers_list <- list()
+
+#Run downsample + SCT + FindMarkers 3 times
+#(Because in each downsample iteration, the count matrix changes up a little bit)
+for (i in 1:3) {
+
+    #call the downsample function
+seurats_post_downsample <-  tryCatch({
+downsample_by_porp (seu_control_sample, seu_patient)
+    }, error = function(e) {
+        stop("The function one_on_one failed because the function downsample_by_porp encountered an error: ", e$message)
+    })
+
+
+
+
+# creating and manipulating seu_merge
+seu_merge <- merge(seurats_post_downsample$seu_control_sample
+,seurats_post_downsample$seu_patient)
+
+
+seu_merge@active.assay <- "RNA"
+seu_merge[["SCT"]] <- NULL
+
+seu_merge[["RNA"]] <- JoinLayers(seu_merge[["RNA"]])
+
+seu_merge <- SCTransform(seu_merge, vars.to.regress = "percent_mito", verbose = TRUE, conserve.memory = TRUE)
+
+Idents(seu_merge) <- "condition"
+
+#maybe we should remove the "matching_item"
+patient_group <-   matching_item <- unique(seu_merge@active.ident)[grep(patient_orig_ident, unique(seu_merge@active.ident))]
+
+de_markers <- FindMarkers(seu_merge, ident.1 = patient_type, group.by = 'condition',logfc.threshold = 0, min.pct = 0,min.cells.feature = 0)
+head(de_markers)
+
+  # Save the result of this iteration into the list
+  de_markers_list[[i]] <- de_markers
+  gc()
+
+  }
+
+
+# Find the intersection of genes across all 3 tables
+{
+  reoccuring_genes <- Reduce(intersect, lapply(de_markers_list, rownames))
+
+# Filter each table to retain only the common genes
+filtered_tables <- lapply(de_markers_list, function(tbl) tbl[reoccuring_genes, ])
+
+# Combine the filtered tables into a single array for averaging
+# This assumes all tables are filtered to have the same genes and structure
+combined_data <- abind::abind(filtered_tables, along = 3)
+
+# Compute the average across the 3rd dimension (iterations) for each gene and each column
+averaged_table <- apply(combined_data, c(1, 2), mean)
+
+# Convert the resulting matrix into a data frame for easier handling
+final_table <- as.data.frame(averaged_table)
+
+# Set row names to the gene names
+rownames(final_table) <- reoccuring_genes
+
+}
+
+#Filter out housekeeping, ribosomal, mitochondrial and hemoglobin genes
+{
+  #Read housekeeping genes names
+
+joshi_hk_genes <- read_excel("/bigdata/bgutman/Collabs/Dror mevorach/data/joshi_low_gini_coefficients_genes.xlsx", col_names = TRUE)
+
+  levanon_hk_genes <- read_excel("/bigdata/bgutman/Collabs/Dror mevorach/data/levanon_housekeeping_genes.xlsx", col_names = TRUE)
+  
+original_table <- final_table  
+  # Add a temporary column with rownames
+final_table$temp_rownames <- rownames(final_table)
+
+# Combine all housekeeping genes from both files into a single vector
+all_hk_genes <- c(joshi_hk_genes[[2]], levanon_hk_genes[[1]])
+
+# Store the initial number of rows in final_table
+initial_row_count <- nrow(final_table)
+
+# Filter out rows whose names are in the housekeeping genes
+final_table <- final_table[!final_table$temp_rownames %in% all_hk_genes, ]
+
+
+
+# Calculate and print the number of rows removed
+rows_removed <- initial_row_count - nrow(final_table)
+print(paste("Number of housekeeping genes removed:", rows_removed))
+
+initial_row_count <- nrow(final_table)
+
+final_table <- final_table[!grepl("^MT-|^RP[SL]|^HB[^(P|E|S)]|^AC[0-9]+\\.[0-9]+$", final_table$temp_rownames), ]
+
+final_table$temp_rownames <- NULL
+
+rows_removed <- initial_row_count - nrow(final_table)
+print(paste("Number of additonal ribosomal, mitochondrial and hemoglobin genes and some lncRNAs removed:", rows_removed))
+
+  
+}
+
+
+#get the log2 expression scatter plot
+
+plot_and_data <- tryCatch({
+get_p_avg_expr_log2 (seu_merge , patient_type,control_type)
+    }, error = function(e) {
+        stop("The function one_on_one failed because the function get_p_avg_expr_log2 encountered an error: ", e$message)
+    })
+
+#violin plot
+{
+  plot <- VlnPlot(seu_merge, features = c("nFeature_RNA", "nCount_RNA", "percent_mito","nCount_SCT","nFeature_SCT"), group.by = "condition" ,ncol = 5)
+
+violin_title <- sub(" Patient Averaged Expression Levels$", "", plot_and_data$plot_title)
+
+# Add centered overarching title and print the plot
+print(
+    plot + plot_annotation(
+        title = violin_title,
+        theme = theme(plot.title = element_text(hjust = 0.5))  # hjust = 0.5 centers the title
+    )
+)
+
+}
+
+browser()
+
+# saving plot_and_data in sample_output_list  
+sample_output_list[[control_sample]] <- c(
+  plot_and_data, 
+  list(final_table = final_table, original_table = original_table)
+)
+
+
+
+
+}
+
+
+seurat_output_list <- list()
+
+seurat_output_list[[as.character(unique(seu_control$orig.ident)[1])]] <- sample_output_list
+
+
+
+
+return(seurat_output_list) 
+
+}
+
+
+
+
+
+```
+
+```{r, "get_p_avg_expr_log2 function"}
+
+get_p_avg_expr_log2 <- function(seu, patient_condition ="Mevorach", control_condition) {
+  
+  Idents(seu) <- "condition"
+  DefaultAssay(seu) <- "SCT"
+  
+  avg_exp <- AverageExpression(seu, assays = "SCT", group.by = "condition")
+  avg_exp <- as.data.frame(avg_exp)
+  
+  # Making sure the columns are numeric and making it ready for log
+# Making sure the columns are numeric and making it ready for log
+  
+column_names <- colnames(avg_exp)
+
+#Creating new, eazy to work with columns
+{
+  {if (!(length(column_names) == 2)) {
+    stop("Error in the function 'get_p_avg_expr_log2': The number of unique original idents in the merged Seurat object isn't 2 as expected. Please change it accordingly")
+} else if (any(grepl(patient_condition, column_names[1]))) {
+    avg_exp$SCT.patient <- avg_exp[[column_names[1]]]
+    avg_exp$SCT.control <- avg_exp[[column_names[2]]]
+} else if (any(grepl(patient_condition, column_names[2]))) {
+    avg_exp$SCT.patient <- avg_exp[[column_names[2]]]
+    avg_exp$SCT.control <- avg_exp[[column_names[1]]]
+}
+  else {
+    # If patient identifier is not found in either column name
+    stop("Error in the function 'get_p_avg_expr_log2': patient_condition was not found in any of the original idents. Please make sure to call the function with the correct patient_condition")
+}
+}
+
+#Remove the original columns
+avg_exp[[column_names[1]]] <- NULL
+avg_exp[[column_names[2]]] <- NULL
+  
+}
+
+          
+  avg_exp$SCT.control <- as.numeric(as.character(avg_exp$SCT.control))
+  avg_exp$SCT.patient <- as.numeric(as.character(avg_exp$SCT.patient))
+  
+  avg_exp$SCT.control <- avg_exp$SCT.control + 1
+  avg_exp$SCT.patient <- avg_exp$SCT.patient + 1
+  
+  line_data <- data.frame(x = range(avg_exp$SCT.control, avg_exp$SCT.patient, na.rm = TRUE))
+  line_data$y <- line_data$x  # displaying the line y = x
+  avg_exp <- avg_exp %>% tibble::rownames_to_column("gene")
+
+gene_to_be_displayed <- avg_exp %>%
+    filter(SCT.patient >= 1.5,
+           SCT.patient >= SCT.control,
+           SCT.patient > 2,
+           SCT.control > 2) %>% pull(gene)
+  
+  
+weird_genes <- avg_exp %>%
+    filter(SCT.patient >= SCT.control,
+          SCT.control <1.1,
+          SCT.patient > 1.35
+           ) %>% pull(gene)  
+
+
+
+
+housekeeping_genes <- c("B2M", "H3F3A", "MALAT1", "YBX1", "UBA52", 
+                        "PSMB9", "ATP5E", "ATP5L", "UQCR11", "TOMM7")
+    
+# Filter genes for labeling
+
+label_genes <- avg_exp %>%
+    filter(gene %in% gene_to_be_displayed,
+            !(gene %in% housekeeping_genes),
+           !grepl("^MT", gene),
+           !grepl("^RP", gene),
+          (SCT.patient - SCT.control) >= 0.5)
+
+
+
+
+  
+  mt_genes <- (length(grep("^MT", gene_to_be_displayed)) / length(gene_to_be_displayed)) * 100
+  ribo_genes <- (length(grep("^RP", gene_to_be_displayed)) / length(gene_to_be_displayed)) * 100
+  
+#setting the plot title  
+  {
+
+#The control sample is the without the "-pt"|" or the "-ctrl", as these are the suffix of all the sample names in seu_cd59 and seu-cd55
+
+
+# browser()
+
+control_sample_name <-    
+unique(seu@meta.data$sample[seu@meta.data$condition == control_condition])       
+        
+patient_sample_name <-    
+unique(seu@meta.data$sample[seu@meta.data$condition == patient_condition]) 
+   
+orig_ident_control_sample <- unique(seu@meta.data$orig.ident[seu@meta.data$sample == control_sample_name])
+
+orig_ident_patient_sample <- unique(seu@meta.data$orig.ident[seu@meta.data$condition == patient_condition])
+
+
+
+# disease_condition_name <- 
+# unique(seu@meta.data$condition)[unique(seu@meta.data$condition) != control_condition]
+
+plot_title <- paste0(control_condition, " Control (",control_sample_name, " from ",orig_ident_control_sample,")"," vs ",patient_condition," Patient (", patient_sample_name, " from ", orig_ident_patient_sample,") Averaged Expression Levels")    
+
+}
+
+  
+p_avg_mon <- ggplot(avg_exp, aes(x = SCT.control, y = SCT.patient)) +
+    geom_point(aes(color = ifelse(gene %in% gene_to_be_displayed, "significant", "non-significant"))) +
+    geom_line(data = line_data, aes(x = x, y = y), color = "blue") +
+    scale_x_continuous(trans = scales::log2_trans()) +  # Log2 scale for x-axis
+    scale_y_continuous(trans = scales::log2_trans()) +  # Log2 scale for y-axis
+    scale_color_manual(values = c("significant" = "red", "non-significant" = "black")) +
+    labs(x = "Log2(Control)", y = "Log2(Patient)",
+         title = plot_title) +
+    theme_minimal() +
+    guides(color = guide_legend(title = NULL)) +  # Remove legend title
+    annotate("text", x = 0, y = Inf, label = sprintf("Percent of ribo_genes: %.2f%%", ribo_genes), 
+             hjust = -0.1, vjust = 2.1, size = 5, color = "blue") +
+    annotate("text", x = 0, y = Inf, label = sprintf("Percent of mt_genes: %.2f%%", mt_genes), 
+             hjust = -0.1, vjust = 4.1, size = 5, color = "blue") +
+    geom_text_repel(data = label_genes, aes(x = SCT.control, y = SCT.patient, label = gene),
+                    size = 3, max.overlaps = Inf)  # Adding gene labels without overlap
+
+  
+print(p_avg_mon)
+  
+output_list <- list()
+output_list$plot <- p_avg_mon
+output_list$de_genes <- gene_to_be_displayed
+output_list$artificat <- weird_genes
+output_list$plot_title <- plot_title
+
+return(output_list)
+}
+
+
+
+
+
+
+```
+
+
+```{r, "downsample function"}
+
+downsample_by_porp <- function(seu_control_sample, seu_patient) {
+
+#downsample
+{
+
+  #find the intersect genes and keep only them in the cms
+
+intersect_genes = intersect(rownames(seu_control_sample@assays$RNA$counts),rownames(seu_patient@assays$RNA$counts))
+
+control_downsampled_cm = seu_control_sample@assays$RNA$counts[intersect_genes,]
+patient_downsampled_cm = seu_patient@assays$RNA$counts[intersect_genes,]
+
+#downsample
+downsampled_cms <- scuttle::downsampleBatches(control_downsampled_cm,patient_downsampled_cm)
+
+
+seu_control_sample <- CreateSeuratObject(counts = downsampled_cms[[1]],meta.data = seu_control_sample@meta.data, min.cells =3,  min.features=200)
+
+seu_patient <- CreateSeuratObject(counts = downsampled_cms[[2]],meta.data = seu_patient@meta.data
+, min.cells =3,  min.features=200)
+
+
+
+seurats_post_downsample <- list("seu_control_sample"= seu_control_sample,
+                "seu_patient" = seu_patient)
+
+
+}
+
+
+
+  
+#sanity check density plot
+  {
+    
+    #setting the plot title  
+
+    plot_title <- paste("Density Plot of Number of Counts Between",
+                    unique(seu_control_sample$sample)[[1]], "from",unique(seu_control_sample$orig.ident)[[1]] , "(Control) and", unique(seu_patient$orig.ident)[[1]], "(Patient)")
+
+    
+    df =data.frame(number_of_counts=c(colSums(downsampled_cms[[1]]),colSums(downsampled_cms[[2]])),group=c(rep('control',ncol(downsampled_cms[[1]])),rep('patient',ncol(downsampled_cms[[2]]))))
+
+        
+# Create the density plot
+plot <- ggplot(data = df, aes(x = number_of_counts, group = group, fill = group)) +
+  geom_density(adjust = 1.5, alpha = 0.6) +  
+  scale_fill_manual(values = c("steelblue", "coral")) +  #
+  labs(
+    title = plot_title,
+    x = "Number of Counts",
+    y = "Density",
+    fill = "Group"
+  ) +  
+  theme_minimal(base_size = 14) + 
+  theme(
+    legend.position = "top",      
+    legend.title = element_text(face = "plain"),  
+    legend.text = element_text(size = 12),      
+    plot.title = element_text(hjust = 0.5, face = "bold"),  
+    axis.title = element_text(face = "bold")    
+  )
+
+print(plot)
+
+seurats_post_downsample <- list("seu_control_sample"= seu_control_sample,
+                "seu_patient" = seu_patient)
+return(seurats_post_downsample)
+  }
+  
+
+
+}
+
+```
+
+
+
+
+```{r "try: calling one_on_one for cd59", eval=FALSE}
+
+seu_patient <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd59_nk.qs")
+  output_list <- list()
+
+  options(future.globals.maxSize = 10 * 1024 * 1024 * 1024)  # 10 GB
+  
+  # seu_hong <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_hong.qs")
+
+# list_seu <- list(
+#   "seu_hong" = seu_hong)
+
+seu_control <- list_seu[[1]]
+patient_type="CD59-Def"
+control_type="Healthy"
+patient_orig_ident ="Mevorach"
+control_sample <- unique(seu_control$sample)[1]
+  
+list_seu <- list(
+  "seu_patient" = seu_patient)
+
+for (seu in list_seu) {
+  
+  # Run one-on-one function and get output
+  output <- one_on_one(seu_patient, seu, patient_type="CD59-Def", control_type="Healthy", patient_orig_ident="Mevorach")
+  
+  
+# browser()
+ 
+  # Extract orig.ident value
+  orig_ident_value <- as.character(unique(seu$orig.ident)[1])
+
+  # Check if the orig.ident value already exists in output_list
+  if (orig_ident_value %in% names(output_list)) {
+    # If it exists, append to the existing list under that identifier
+    output_list[[orig_ident_value]] <- append(output_list[[orig_ident_value]], output[[orig_ident_value]])} else {
+    # If it does not exist, create a new entry in the list
+        output_list[[orig_ident_value]] <- output[[orig_ident_value]]
+
+  }
+}
+
+qsave(output_list,"/bigdata/bgutman/Collabs/Dror mevorach/data/new_output_list.qs")
+
+
+
+
+
+
+```
+
+
+```{r "manually adding the mevorach controls", eval=FALSE}
+
+
+
+
+
+#CD55  
+{
+  seu_patient <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd59_nk.qs")
+  output_list <- list()
+seu_try <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd55_nk.qs")
+
+  options(future.globals.maxSize = 10 * 1024 * 1024 * 1024)  # 10 GB
+  
+  # seu_hong <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_hong.qs")
+
+# list_seu <- list(
+#   "seu_hong" = seu_hong)
+
+patient_type="CD59-Def"
+control_type="Healthy"
+patient_orig_ident ="Mevorach"
+control_sample <- unique(seu_control$sample)[1]
+  
+list_seu <- list(
+  "seu_try" = seu_try)
+
+seu_control <- list_seu[[1]]
+
+sample_output_list <- list()
+
+seu_control <- subset(seu_control,subset= condition == control_type)
+seu_patient <- subset(seu_patient,subset= condition == patient_type)
+
+control_sample <- "Healthy"
+
+#For each "healthy" sample in seu_control 
+for (control_sample in unique(seu_control$condition)) {
+  
+  #Subset to the that one healthy sample
+  seu_control_sample <- subset(seu_control,subset= condition == control_sample)
+  
+de_markers_list <- list()
+
+#Run downsample + SCT + FindMarkers 3 times
+#(Because in each downsample iteration, the count matrix changes up a little bit)
+for (i in 1:3) {
+
+    #call the downsample function
+seurats_post_downsample <-  tryCatch({
+downsample_by_porp (seu_control_sample, seu_patient)
+    }, error = function(e) {
+        stop("The function one_on_one failed because the function downsample_by_porp encountered an error: ", e$message)
+    })
+
+
+
+
+# creating and manipulating seu_merge
+seu_merge <- merge(seurats_post_downsample$seu_control_sample
+,seurats_post_downsample$seu_patient)
+
+
+seu_merge@active.assay <- "RNA"
+seu_merge[["SCT"]] <- NULL
+
+seu_merge[["RNA"]] <- JoinLayers(seu_merge[["RNA"]])
+
+seu_merge <- SCTransform(seu_merge, vars.to.regress = "percent_mito", verbose = TRUE, conserve.memory = TRUE)
+
+Idents(seu_merge) <- "orig.ident"
+
+#maybe we should remove the "matching_item"
+patient_group <-   matching_item <- unique(seu_merge@active.ident)[grep(patient_orig_ident, unique(seu_merge@active.ident))]
+
+
+patient_group <- "CD59-Def"
+de_markers <- FindMarkers(seu_merge, ident.1 = patient_group, group.by = 'condition',logfc.threshold = 0, min.pct = 0,min.cells.feature = 0)
+head(de_markers)
+
+  # Save the result of this iteration into the list
+  de_markers_list[[i]] <- de_markers
+  gc()
+
+  }
+
+
+# Find the intersection of genes across all 3 tables
+{
+  reoccuring_genes <- Reduce(intersect, lapply(de_markers_list, rownames))
+
+# Filter each table to retain only the common genes
+filtered_tables <- lapply(de_markers_list, function(tbl) tbl[reoccuring_genes, ])
+
+# Combine the filtered tables into a single array for averaging
+# This assumes all tables are filtered to have the same genes and structure
+combined_data <- abind::abind(filtered_tables, along = 3)
+
+# Compute the average across the 3rd dimension (iterations) for each gene and each column
+averaged_table <- apply(combined_data, c(1, 2), mean)
+
+# Convert the resulting matrix into a data frame for easier handling
+final_table <- as.data.frame(averaged_table)
+
+# Set row names to the gene names
+rownames(final_table) <- reoccuring_genes
+
+}
+
+#Filter out housekeeping, ribosomal, mitochondrial and hemoglobin genes
+{
+  #Read housekeeping genes names
+
+joshi_hk_genes <- read_excel("/bigdata/bgutman/Collabs/Dror mevorach/data/joshi_low_gini_coefficients_genes.xlsx", col_names = TRUE)
+
+  levanon_hk_genes <- read_excel("/bigdata/bgutman/Collabs/Dror mevorach/data/levanon_housekeeping_genes.xlsx", col_names = TRUE)
+  
+original_table <- final_table  
+  # Add a temporary column with rownames
+final_table$temp_rownames <- rownames(final_table)
+
+# Combine all housekeeping genes from both files into a single vector
+all_hk_genes <- c(joshi_hk_genes[[2]], levanon_hk_genes[[1]])
+
+# Store the initial number of rows in final_table
+initial_row_count <- nrow(final_table)
+
+# Filter out rows whose names are in the housekeeping genes
+final_table <- final_table[!final_table$temp_rownames %in% all_hk_genes, ]
+
+
+
+# Calculate and print the number of rows removed
+rows_removed <- initial_row_count - nrow(final_table)
+print(paste("Number of housekeeping genes removed:", rows_removed))
+
+initial_row_count <- nrow(final_table)
+
+final_table <- final_table[!grepl("^MT-|^RP[SL]|^HB[^(P|E|S)]|^AC[0-9]+\\.[0-9]+$", final_table$temp_rownames), ]
+
+final_table$temp_rownames <- NULL
+
+rows_removed <- initial_row_count - nrow(final_table)
+print(paste("Number of additonal ribosomal, mitochondrial and hemoglobin genes and some lncRNAs removed:", rows_removed))
+
+  
+}
+
+
+#get the log2 expression scatter plot
+
+
+
+#violin plot
+{
+  plot <- VlnPlot(seu_merge, features = c("nFeature_RNA", "nCount_RNA", "percent_mito","nCount_SCT","nFeature_SCT"), group.by = "orig.ident" ,ncol = 5)
+
+violin_title <- "Kill me please"
+
+# Add centered overarching title and print the plot
+print(
+    plot + plot_annotation(
+        title = violin_title,
+        theme = theme(plot.title = element_text(hjust = 0.5))  # hjust = 0.5 centers the title
+    )
+)
+
+}
+
+# saving plot_and_data in sample_output_list  
+sample_output_list[[control_sample]] <- c(
+  #plot_and_data, 
+  list(final_table = final_table, original_table = original_table)
+)
+
+
+
+
+}
+
+
+seurat_output_list <- list()
+
+seurat_output_list[[as.character(unique(seu_control$orig.ident)[1])]] <- sample_output_list
+
+
+cd55_healthy <- seurat_output_list
+
+qsave(cd55_healthy,"/bigdata/bgutman/Collabs/Dror mevorach/data/cd55_healthy_tables.qs")
+}
+
+
+#CD59
+{
+  seu_patient <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd59_nk.qs")
+  output_list <- list()
+seu_try <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd55_nk.qs")
+
+  options(future.globals.maxSize = 10 * 1024 * 1024 * 1024)  # 10 GB
+  
+  # seu_hong <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_hong.qs")
+
+# list_seu <- list(
+#   "seu_hong" = seu_hong)
+
+patient_type="CD59-Def"
+control_type="Healthy"
+patient_orig_ident ="Mevorach"
+control_sample <- unique(seu_control$sample)[1]
+  
+list_seu <- list(
+  "seu_try" = seu_try)
+
+seu_control <- list_seu[[1]]
+
+sample_output_list <- list()
+
+seu_control <- subset(seu_control,subset= condition == control_type)
+seu_patient <- subset(seu_patient,subset= condition == patient_type)
+
+control_sample <- "Healthy"
+
+#For each "healthy" sample in seu_control 
+for (control_sample in unique(seu_control$condition)) {
+  
+  #Subset to the that one healthy sample
+  seu_control_sample <- subset(seu_control,subset= condition == control_sample)
+  
+de_markers_list <- list()
+
+#Run downsample + SCT + FindMarkers 3 times
+#(Because in each downsample iteration, the count matrix changes up a little bit)
+for (i in 1:3) {
+
+    #call the downsample function
+seurats_post_downsample <-  tryCatch({
+downsample_by_porp (seu_control_sample, seu_patient)
+    }, error = function(e) {
+        stop("The function one_on_one failed because the function downsample_by_porp encountered an error: ", e$message)
+    })
+
+
+
+
+# creating and manipulating seu_merge
+seu_merge <- merge(seurats_post_downsample$seu_control_sample
+,seurats_post_downsample$seu_patient)
+
+
+seu_merge@active.assay <- "RNA"
+seu_merge[["SCT"]] <- NULL
+
+seu_merge[["RNA"]] <- JoinLayers(seu_merge[["RNA"]])
+
+seu_merge <- SCTransform(seu_merge, vars.to.regress = "percent_mito", verbose = TRUE, conserve.memory = TRUE)
+
+Idents(seu_merge) <- "orig.ident"
+
+#maybe we should remove the "matching_item"
+patient_group <-   matching_item <- unique(seu_merge@active.ident)[grep(patient_orig_ident, unique(seu_merge@active.ident))]
+
+patient_group <- "CD59-Def"
+de_markers <- FindMarkers(seu_merge, ident.1 = patient_group, group.by = 'condition',logfc.threshold = 0, min.pct = 0,min.cells.feature = 0)
+head(de_markers)
+
+  # Save the result of this iteration into the list
+  de_markers_list[[i]] <- de_markers
+  gc()
+
+  }
+
+
+# Find the intersection of genes across all 3 tables
+{
+  reoccuring_genes <- Reduce(intersect, lapply(de_markers_list, rownames))
+
+# Filter each table to retain only the common genes
+filtered_tables <- lapply(de_markers_list, function(tbl) tbl[reoccuring_genes, ])
+
+# Combine the filtered tables into a single array for averaging
+# This assumes all tables are filtered to have the same genes and structure
+combined_data <- abind::abind(filtered_tables, along = 3)
+
+# Compute the average across the 3rd dimension (iterations) for each gene and each column
+averaged_table <- apply(combined_data, c(1, 2), mean)
+
+# Convert the resulting matrix into a data frame for easier handling
+final_table <- as.data.frame(averaged_table)
+
+# Set row names to the gene names
+rownames(final_table) <- reoccuring_genes
+
+}
+
+#Filter out housekeeping, ribosomal, mitochondrial and hemoglobin genes
+{
+  #Read housekeeping genes names
+
+joshi_hk_genes <- read_excel("/bigdata/bgutman/Collabs/Dror mevorach/data/joshi_low_gini_coefficients_genes.xlsx", col_names = TRUE)
+
+  levanon_hk_genes <- read_excel("/bigdata/bgutman/Collabs/Dror mevorach/data/levanon_housekeeping_genes.xlsx", col_names = TRUE)
+  
+original_table <- final_table  
+  # Add a temporary column with rownames
+final_table$temp_rownames <- rownames(final_table)
+
+# Combine all housekeeping genes from both files into a single vector
+all_hk_genes <- c(joshi_hk_genes[[2]], levanon_hk_genes[[1]])
+
+# Store the initial number of rows in final_table
+initial_row_count <- nrow(final_table)
+
+# Filter out rows whose names are in the housekeeping genes
+final_table <- final_table[!final_table$temp_rownames %in% all_hk_genes, ]
+
+
+
+# Calculate and print the number of rows removed
+rows_removed <- initial_row_count - nrow(final_table)
+print(paste("Number of housekeeping genes removed:", rows_removed))
+
+initial_row_count <- nrow(final_table)
+
+final_table <- final_table[!grepl("^MT-|^RP[SL]|^HB[^(P|E|S)]|^AC[0-9]+\\.[0-9]+$", final_table$temp_rownames), ]
+
+final_table$temp_rownames <- NULL
+
+rows_removed <- initial_row_count - nrow(final_table)
+print(paste("Number of additonal ribosomal, mitochondrial and hemoglobin genes and some lncRNAs removed:", rows_removed))
+
+  
+}
+
+
+#get the log2 expression scatter plot
+
+
+
+#violin plot
+{
+  plot <- VlnPlot(seu_merge, features = c("nFeature_RNA", "nCount_RNA", "percent_mito","nCount_SCT","nFeature_SCT"), group.by = "orig.ident" ,ncol = 5)
+
+violin_title <- "Kill me please"
+
+# Add centered overarching title and print the plot
+print(
+    plot + plot_annotation(
+        title = violin_title,
+        theme = theme(plot.title = element_text(hjust = 0.5))  # hjust = 0.5 centers the title
+    )
+)
+
+}
+
+# saving plot_and_data in sample_output_list  
+sample_output_list[[control_sample]] <- c(
+  #plot_and_data, 
+  list(final_table = final_table, original_table = original_table)
+)
+
+
+
+
+}
+
+
+seurat_output_list <- list()
+
+seurat_output_list[[as.character(unique(seu_control$orig.ident)[1])]] <- sample_output_list
+
+
+cd55_healthy <- seurat_output_list
+
+qsave(cd59_healthy,"/bigdata/bgutman/Collabs/Dror mevorach/data/cd59_healthy_tables.qs")
+}
+
+
+#Adjusting the output_list
+
+{
+  output_list <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/new_output_list.qs")
+
+cd59_healthy <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/cd59_healthy_tables.qs")
+
+cd55_healthy <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/cd55_healthy_tables.qs")
+
+names(cd59_healthy$`cd_59-Mevorach`)[names(cd59_healthy$`cd_59-Mevorach`) == "Healthy"] <- "CD59_Healthy"
+
+names(cd55_healthy$`cd55-Mevorach`)[names(cd55_healthy$`cd55-Mevorach`) == "Healthy"] <- "CD55_Healthy"
+
+output_list$Mevorach <- list(
+  "CD55_Healthy" = cd55_healthy$`cd55-Mevorach`$CD55_Healthy,
+  "CD59_Healthy" = cd59_healthy$`cd_59-Mevorach`$CD59_Healthy
+)
+
+qsave(output_list,"/bigdata/bgutman/Collabs/Dror mevorach/data/new_output_list.qs")
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+Overall, I aimed to balance simplicity with statistical rigor. I considered the interpretability of volcano plots and sought metrics that account for both the q-value and log2FC. Additionally, I wanted to address the differences in the proportions of cells in each group expressing each gene (captured by "pct.1" and "pct.2"). After careful consideration, accompanied by trial and error, I selected the following metrics of interest:
+
+1. gene_count: The number of tables in which a gene appears. Some genes are depleted or show no differential expression in certain datasets, and as a result, they may not appear in all tables.
+
+2. fisher: Fisher's exact test applied to the raw p-values of a gene across all the tables in which it appears. This metric combines the evidence of significance across multiple datasets.
+
+3. rank_log2FC_averge: The average of the ranks (based on descending log2FC values) for each gene within the tables in which it appears.
+
+4. avg_log2FC_averge: The average log2FC value for each gene across all tables in which it appears.
+
+5. avg_pct_dif: The average difference between the proportions of cells expressing the gene in each group, calculated as pct.1 - pct.2, across all tables in which the gene appears.
+
+6. percent_significant_pct_patient_threshold / percent_significant_pct_control_threshold: The percentage of tables in which the gene is considered "significant." A gene is considered significant if:
+
+- For patient significance: pct.1 ≥ 0.5 and (pct.1 - pct.2) ≥ 0.2.
+- For control significance: pct.2 ≥ 0.5 and (pct.2 - pct.1) ≥ 0.2.
+
+7. percent_significant_pct_patient_q3 / percent_significant_pct_control_q3: The percentage of tables in which the gene is considered "significant," where significance is defined as:
+
+- For patient significance: pct.1 ≥ 0.5 and (pct.1 - pct.2) is above the Q3 of all (pct.1 - pct.2) differences in that table.
+- For control significance: pct.2 ≥ 0.5 and (pct.2 - pct.1) is above the Q3 of all (pct.2 - pct.1) differences in that table.
+
+8. percent_significant_pct_patient_q3_1_5_iqr / percent_significant_pct_control_q3_1_5_iqr: Similar to the above, but instead of the Q3 threshold alone, significance is determined if:
+
+- For patient significance: pct.1 ≥ 0.5 and (pct.1 - pct.2) is above Q3 + 1.5 * IQR.
+- For control significance: pct.2 ≥ 0.5 and (pct.2 - pct.1) is above Q3 + 1.5 * IQR.
+
+
+
+```{r, "Creating meta_table",eval=FALSE}
+
+output_list <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/output_lists/cd59_output_list.qs")
+
+
+# try_after <- output_list$Degagne$pNK_pre_infusion$final_table
+
+
+create_meta_table <- function(output_list) {
+  # Collect all unique genes
+  all_genes <- unique(unlist(lapply(output_list, function(dataset) {
+    unlist(lapply(dataset, function(sample) {
+      rownames(sample$final_table)
+    }))
+  })))
+  
+  # Initialize meta_table and required storage
+  meta_table <- data.frame(row.names = all_genes)
+  gene_count <- numeric(length(all_genes))
+  fisher_scores <- setNames(numeric(length(all_genes)), all_genes)
+  avg_pct_dif_sums <- setNames(numeric(length(all_genes)), all_genes)
+  rank_log2FC_sums <- setNames(numeric(length(all_genes)), all_genes)
+  avg_log2FC_sums <- setNames(numeric(length(all_genes)), all_genes)
+  significant_counts_threshold <- setNames(numeric(length(all_genes)), all_genes)
+  significant_counts_q3 <- setNames(numeric(length(all_genes)), all_genes)
+  significant_counts_q3_1_5_iqr <- setNames(numeric(length(all_genes)), all_genes)
+  significant_control_counts_threshold <- setNames(numeric(length(all_genes)), all_genes)
+  significant_control_counts_q3 <- setNames(numeric(length(all_genes)), all_genes)
+  significant_control_counts_q3_1_5_iqr <- setNames(numeric(length(all_genes)), all_genes)
+  
+  # Precompute Q3 and IQR
+  for (dataset in output_list) {
+    for (sample in dataset) {
+      final_table <- sample$final_table
+      final_table$pct_dif <- final_table$pct.1 - final_table$pct.2
+      final_table$pct_dif_control <- final_table$pct.2 - final_table$pct.1
+      
+      q3 <- quantile(final_table$pct_dif, 0.75, na.rm = TRUE)
+      iqr <- IQR(final_table$pct_dif, na.rm = TRUE)
+      q3_1_5_iqr <- q3 + 1.5 * iqr
+      
+      q3_control <- quantile(final_table$pct_dif_control, 0.75, na.rm = TRUE)
+      iqr_control <- IQR(final_table$pct_dif_control, na.rm = TRUE)
+      q3_1_5_iqr_control <- q3_control + 1.5 * iqr_control
+
+      # Rank genes within the current table by avg_log2FC
+      if ("avg_log2FC" %in% colnames(final_table)) {
+        log2FC_values <- final_table[, "avg_log2FC"]
+        ranks <- rank(-log2FC_values, na.last = "keep")  # Descending rank
+        names(ranks) <- rownames(final_table)  # Assign gene names to ranks
+      }
+      
+      # Iterate over genes in the table
+      for (gene in rownames(final_table)) {
+        gene_idx <- match(gene, all_genes)
+        
+        # Update gene count
+        gene_count[gene_idx] <- gene_count[gene_idx] + 1
+        
+        # Update Fisher scores
+        p_val <- final_table[gene, "p_val"]  # Use raw p-values
+        if (!is.na(p_val)) {
+          fisher_scores[gene] <- fisher_scores[gene] + (-2 * log(p_val))
+        }
+        
+        # Update avg_pct_dif
+        pct_dif <- final_table[gene, "pct_dif"]
+        if (!is.na(pct_dif)) {
+          avg_pct_dif_sums[gene] <- avg_pct_dif_sums[gene] + pct_dif
+        }
+        
+        # Update rank_log2FC
+        if (exists("ranks") && !is.na(ranks[gene])) {
+          rank_log2FC_sums[gene] <- rank_log2FC_sums[gene] + ranks[gene]
+        }
+        
+        # Update avg_log2FC
+        avg_log2FC <- final_table[gene, "avg_log2FC"]
+        if (!is.na(avg_log2FC)) {
+          avg_log2FC_sums[gene] <- avg_log2FC_sums[gene] + avg_log2FC
+        }
+        
+        # Update significance counts
+        pct1 <- final_table[gene, "pct.1"]
+        pct2 <- final_table[gene, "pct.2"]
+        if (!is.na(pct1) && !is.na(pct_dif)) {
+          if (pct1 >= 0.5 && pct_dif >= 0.2) significant_counts_threshold[gene] <- significant_counts_threshold[gene] + 1
+          if (pct1 >= 0.5 && pct_dif > q3) significant_counts_q3[gene] <- significant_counts_q3[gene] + 1
+          if (pct1 >= 0.5 && pct_dif > q3_1_5_iqr) significant_counts_q3_1_5_iqr[gene] <- significant_counts_q3_1_5_iqr[gene] + 1
+        }
+        if (!is.na(pct2) && !is.na(final_table[gene, "pct_dif_control"])) {
+          pct_dif_control <- final_table[gene, "pct_dif_control"]
+          if (pct2 >= 0.5 && pct_dif_control >= 0.2) significant_control_counts_threshold[gene] <- significant_control_counts_threshold[gene] + 1
+          if (pct2 >= 0.5 && pct_dif_control > q3_control) significant_control_counts_q3[gene] <- significant_control_counts_q3[gene] + 1
+          if (pct2 >= 0.5 && pct_dif_control > q3_1_5_iqr_control) significant_control_counts_q3_1_5_iqr[gene] <- significant_control_counts_q3_1_5_iqr[gene] + 1
+        }
+      }
+    }
+  }
+  
+  # Assign metrics to meta_table
+  number_of_samples <- sum(sapply(output_list, function(dataset) length(dataset)))
+  
+  # Assign Fisher scores and replace Inf values
+  meta_table$gene_count <- gene_count
+  meta_table$fisher <- round(fisher_scores, 2)
+  max_finite_fisher <- max(fisher_scores[is.finite(fisher_scores)], na.rm = TRUE)
+  meta_table$fisher[is.infinite(meta_table$fisher)] <- max_finite_fisher + 100
+  
+  meta_table$avg_pct_dif <- round((avg_pct_dif_sums / gene_count), 2)
+  meta_table$rank_log2FC_averge <- round((rank_log2FC_sums / gene_count), 2)
+  meta_table$avg_log2FC_averge <- round((avg_log2FC_sums / gene_count), 2)
+  meta_table$percent_significant_pct_patient_threshold <- round((significant_counts_threshold / number_of_samples) * 100, 2)
+  meta_table$percent_significant_pct_patient_q3 <- round((significant_counts_q3 / number_of_samples) * 100, 2)
+  meta_table$percent_significant_pct_patient_q3_1_5_iqr <- round((significant_counts_q3_1_5_iqr / number_of_samples) * 100, 2)
+  meta_table$percent_significant_pct_control_threshold <- round((significant_control_counts_threshold / number_of_samples) * 100, 2)
+  meta_table$percent_significant_pct_control_q3 <- round((significant_control_counts_q3 / number_of_samples) * 100, 2)
+  meta_table$percent_significant_pct_control_q3_1_5_iqr <- round((significant_control_counts_q3_1_5_iqr / number_of_samples) * 100, 2)
+  
+  return(meta_table)
+}
+
+#Creating meta_table
+  meta_table <- create_meta_table(output_list)
+  
+
+meta_table <- meta_table %>% filter(gene_count > 9) 
+
+#Keep only the relevant 6 columns
+meta_table <- meta_table %>% dplyr::select("gene_count", "fisher", "avg_log2FC_averge", "avg_pct_dif",                       "percent_significant_pct_patient_threshold", "percent_significant_pct_patient_q3", "percent_significant_pct_patient_q3_1_5_iqr", "percent_significant_pct_control_threshold","percent_significant_pct_control_q3","percent_significant_pct_control_q3_1_5_iqr")
+
+
+meta_table <- meta_table %>%
+  rename(avg_log2FC = avg_log2FC_averge)
+
+qsave(meta_table,"/bigdata/bgutman/Collabs/Dror mevorach/data/meta_table.qs")
+
+try <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/meta_table.qs")
+  
+```
+
+We will do some nice experimenting in here and based on Dvirs feedback, we will decide which things do we want to add to the "create meta_table" function. Obviously we also need to remove stuff from there.
+
+
+```{r, " further modifying meta_table",eval=FALSE}
+
+
+#We will do some nice experimenting in here and based on Dvirs feedback, we will decide which things do we want to add to the "create meta_table" function. Obviously we also need to remove stuff from there.
+
+cd59_meta_table <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/meta_tables/cd59_meta_table.qs")
+
+
+cd59_meta_table <- cd59_meta_table %>% dplyr::select(-"percent_significant_pct_patient_threshold", -"percent_significant_pct_patient_q3",-"percent_significant_pct_control_threshold", -"percent_significant_pct_control_q3",-"gene_count")
+
+
+
+
+#slim function
+create_meta_table <- function(output_list) {
+  # Collect all unique genes
+  all_genes <- unique(unlist(lapply(output_list, function(dataset) {
+    unlist(lapply(dataset, function(sample) {
+      rownames(sample$final_table)
+    }))
+  })))
+  
+  # Initialize meta_table and required storage
+  meta_table <- data.frame(row.names = all_genes)
+  gene_count <- numeric(length(all_genes))
+  fisher_scores <- setNames(numeric(length(all_genes)), all_genes)
+  avg_pct_dif_sums <- setNames(numeric(length(all_genes)), all_genes)
+  avg_log2FC_sums <- setNames(numeric(length(all_genes)), all_genes)
+  median_log2FC_values <- vector("list", length(all_genes))
+  log2FC_values <- vector("list", length(all_genes))
+  significant_counts_q3_1_5_iqr <- setNames(numeric(length(all_genes)), all_genes)
+  significant_control_counts_q3_1_5_iqr <- setNames(numeric(length(all_genes)), all_genes)
+  count_volcano_patient <- setNames(numeric(length(all_genes)), all_genes)
+  count_volcano_control <- setNames(numeric(length(all_genes)), all_genes)
+  count_direction_control <- setNames(numeric(length(all_genes)), all_genes)
+  count_direction_patient <- setNames(numeric(length(all_genes)), all_genes)
+  
+  # Precompute Q3 and IQR
+  for (dataset in output_list) {
+    for (sample in dataset) {
+      final_table <- sample$final_table
+      final_table$pct_dif <- final_table$pct.1 - final_table$pct.2
+      final_table$pct_dif_control <- final_table$pct.2 - final_table$pct.1
+      
+      q3 <- quantile(final_table$pct_dif, 0.75, na.rm = TRUE)
+      iqr <- IQR(final_table$pct_dif, na.rm = TRUE)
+      q3_1_5_iqr <- q3 + 1.5 * iqr
+      
+      q3_control <- quantile(final_table$pct_dif_control, 0.75, na.rm = TRUE)
+      iqr_control <- IQR(final_table$pct_dif_control, na.rm = TRUE)
+      q3_1_5_iqr_control <- q3_control + 1.5 * iqr_control
+
+      # Iterate over genes in the table
+      for (gene in rownames(final_table)) {
+        gene_idx <- match(gene, all_genes)
+        
+        # Update gene count
+        gene_count[gene_idx] <- gene_count[gene_idx] + 1
+        
+        # Update Fisher scores
+        p_val <- final_table[gene, "p_val"]  # Use raw p-values
+        if (!is.na(p_val)) {
+          fisher_scores[gene] <- fisher_scores[gene] + (-2 * log(p_val))
+        }
+        
+        # Update avg_pct_dif
+        pct_dif <- final_table[gene, "pct_dif"]
+        if (!is.na(pct_dif)) {
+          avg_pct_dif_sums[gene] <- avg_pct_dif_sums[gene] + pct_dif
+        }
+        
+        # Update avg_log2FC
+        avg_log2FC <- final_table[gene, "avg_log2FC"]
+        if (!is.na(avg_log2FC)) {
+          avg_log2FC_sums[gene] <- avg_log2FC_sums[gene] + avg_log2FC
+          median_log2FC_values[[gene_idx]] <- c(median_log2FC_values[[gene_idx]], avg_log2FC)
+          log2FC_values[[gene_idx]] <- c(log2FC_values[[gene_idx]], avg_log2FC)
+        }
+        
+        # Update significance counts
+        pct1 <- final_table[gene, "pct.1"]
+        if (!is.na(pct1) && !is.na(pct_dif)) {
+          if (pct1 >= 0.5 && pct_dif > q3_1_5_iqr) significant_counts_q3_1_5_iqr[gene] <- significant_counts_q3_1_5_iqr[gene] + 1
+        }
+        pct2 <- final_table[gene, "pct.2"]
+        if (!is.na(pct2) && !is.na(final_table[gene, "pct_dif_control"])) {
+          pct_dif_control <- final_table[gene, "pct_dif_control"]
+          if (pct2 >= 0.5 && pct_dif_control > q3_1_5_iqr_control) significant_control_counts_q3_1_5_iqr[gene] <- significant_control_counts_q3_1_5_iqr[gene] + 1
+        }
+
+        # Update count_volcano_patient
+        if (!is.na(avg_log2FC) && avg_log2FC >= 2.5 && !is.na(final_table[gene, "p_val_adj"]) && final_table[gene, "p_val_adj"] <= 0.05) {
+          count_volcano_patient[gene] <- count_volcano_patient[gene] + 1
+        }
+
+        # Update count_volcano_control
+        if (!is.na(avg_log2FC) && avg_log2FC <= -2.5 && !is.na(final_table[gene, "p_val_adj"]) && final_table[gene, "p_val_adj"] <= 0.05) {
+          count_volcano_control[gene] <- count_volcano_control[gene] + 1
+        }
+
+        # Update count_direction_control
+        if (!is.na(avg_log2FC) && avg_log2FC >= 0.5) {
+          count_direction_control[gene] <- count_direction_control[gene] + 1
+        }
+
+        # Update count_direction_patient
+        if (!is.na(avg_log2FC) && avg_log2FC <= -0.5) {
+          count_direction_patient[gene] <- count_direction_patient[gene] + 1
+        }
+      }
+    }
+  }
+  
+  # Assign metrics to meta_table
+  number_of_samples <- sum(sapply(output_list, function(dataset) length(dataset)))
+  
+  # Assign Fisher scores and replace Inf values
+  
+  meta_table$count_volcano_patient <-   round((count_volcano_patient / number_of_samples) * 100, 2)
+  meta_table$count_volcano_control <-   round((count_volcano_control / number_of_samples) * 100, 2)
+  
+  meta_table$avg_log2FC <- round((avg_log2FC_sums / gene_count), 2)
+  meta_table$median_log2FC <- sapply(median_log2FC_values, function(x) if (length(x) > 0) median(x, na.rm = TRUE) else NA)
+  meta_table$log2FC_variance <- sapply(log2FC_values, function(x) if (length(x) > 1) sd(x, na.rm = TRUE) else NA)
+  meta_table$count_direction_patient <- round((count_direction_patient / number_of_samples) * 100, 2) 
+  meta_table$count_direction_control <- round((count_direction_control / number_of_samples) * 100, 2)
+ 
+  
+  meta_table$fisher <- round(fisher_scores, 2)
+  max_finite_fisher <- max(fisher_scores[is.finite(fisher_scores)], na.rm = TRUE)
+  meta_table$fisher[is.infinite(meta_table$fisher)] <- max_finite_fisher + 100
+  
+  meta_table$avg_pct_dif <- round((avg_pct_dif_sums / gene_count), 2)
+  meta_table$percent_significant_pct_patient_q3_1_5_iqr <- round((significant_counts_q3_1_5_iqr / number_of_samples) * 100, 2)
+  meta_table$percent_significant_pct_control_q3_1_5_iqr <- round((significant_control_counts_q3_1_5_iqr / number_of_samples) * 100, 2)
+
+
+
+  # Add gene_count as "comparisons_num" as the first column
+  meta_table <- cbind(comparisons_num = gene_count, meta_table)
+
+  return(meta_table)
+}
+
+# output_list <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/output_lists/cd59_output_list.qs")
+
+meta_table <- create_meta_table(output_list)
+
+meta_table <- meta_table %>% filter(comparisons_num > 9)
+
+qsave(meta_table,"/bigdata/bgutman/Collabs/Dror mevorach/data/meta_tables/cd59_meta_table.qs")
+
+saveRDS(meta_table, file = "/bigdata/bgutman/Collabs/Dror mevorach/data/meta_tables/cd59_meta_table_rds.rds")
+
+
+```
+
+
+
+``` {r, "scttaer_plots_no_SD_few_genes_size_gene_count"}
+
+pct_boxplot <- function(output_list, gene_name, patient_label = "Patient") {
+  
+  # Initialize variables
+  pct1_value <- NULL  # To store pct.1 (single value)
+  pct2_values <- numeric()  # To store all pct.2 values
+  p_val_adj_values <- numeric()
+  log2FC_values <- numeric()
+  dataset <- c()
+  sample <- c()
+  pct1_extracted <- FALSE  # Flag to indicate if pct.1 has been extracted
+  
+  # Iterate over datasets and samples in the output list
+  for (dataset_name in names(output_list)) {
+    for (sample_name in names(output_list[[dataset_name]])) {
+      # Get the final_table for the sample
+      final_table <- output_list[[dataset_name]][[sample_name]]$final_table
+      
+      # Check if the gene is in the final_table
+      if (gene_name %in% rownames(final_table)) {
+        # Extract the row corresponding to the gene
+        gene_row <- final_table[rownames(final_table) == gene_name, ]
+        
+        # Extract pct.1 only once
+        if (!pct1_extracted) {
+          pct1_value <- gene_row$pct.1
+          pct1_extracted <- TRUE
+        }
+        
+        # Extract pct.2, p_val_adj, and log2FC
+        pct2_values <- c(pct2_values, gene_row$pct.2)
+        p_val_adj_values <- c(p_val_adj_values, -log10(gene_row$p_val_adj + 1e-300))
+        log2FC_values <- c(log2FC_values, gene_row$avg_log2FC)
+        dataset <- c(dataset, dataset_name)
+        sample <- c(sample, sample_name)
+      }
+    }
+  }
+  
+  # Boxplot
+  {
+    
+     boxplot_data <- data.frame(
+    pct_value = c(pct1_value, pct2_values),
+    source = factor(c(patient_label, rep("Control", length(pct2_values))),
+                    levels = c(patient_label, "Control")),  # Explicit order
+    color = c("red", rep("black", length(pct2_values))),
+    stringsAsFactors = FALSE
+  )
+  
+  boxplot <- ggplot(boxplot_data, aes(x = source, y = pct_value)) +
+    geom_point(data = subset(boxplot_data, source == patient_label),
+               aes(color = color), size = 3) +
+    geom_boxplot(data = subset(boxplot_data, source == "Control"),
+                 aes(group = source),
+                 outlier.shape = NA,
+                 fill = "gray90",
+                 color = "black") +
+    geom_jitter(data = subset(boxplot_data, source == "Control"),
+                aes(color = color), width = 0.2, size = 2) +
+    scale_color_manual(
+      values = c("red" = "red", "black" = "black"),
+      labels = c("red" = patient_label, "black" = "Control")
+    ) +
+    labs(
+      title = paste("PCT Boxplot for Gene:", gene_name),
+      x = "Group",
+      y = "Percentage Value",
+      color = "Legend"
+    ) +
+    theme_minimal()
+  
+    
+  }
+  
+  
+  
+  # Scatter Plot
+  
+  {
+      scatter_data <- data.frame(
+    sample = sample,
+    dataset = dataset,
+    neg_log10q = p_val_adj_values,
+    log2FC = log2FC_values
+  )
+  
+    title <- paste("Scatter Plot of -log10(q) vs log2(FC) of",gene_name)
+    
+  scatter_plot <- ggplot(scatter_data, aes(x = log2FC, y = neg_log10q, color = dataset)) +
+    geom_point(size = 3, alpha = 0.7) +
+    scale_y_continuous(name = "-log10(q)") +
+    scale_x_continuous(name = "log2(FC)") +
+    labs(
+      title = title,
+      color = "Dataset"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      plot.title = element_text(hjust = 0.5),
+      legend.position = "right",
+      panel.grid.major = element_line(color = "gray80"),
+      panel.grid.minor = element_blank()
+    )
+  }
+
+  
+  # Return the plots as a list
+  return(list(boxplot = boxplot, scatter_plot = scatter_plot))
+}
+
+
+
+
+
+interest_genes <- meta_table %>%
+  dplyr::filter(percent_significant_pct_patient_q3_1_5_iqr > 75) %>%
+  rownames_to_column(var = "rowname") %>%  # Move rownames to a column for filtering
+  pull(rowname)  # Pull the rownames as a vector
+
+interest_genes <- c( "LY6E", "CD52","CCL3L1", "HLA-G","KLRB1", "KLRF1", "KLRD1")
+
+for (gene in interest_genes){
+  
+  plots <-pct_boxplot(output_list, gene,"CD59 def") 
+
+print(plots$boxplot)
+print(plots$scatter_plot)
+
+
+}
+
+
+
+
+
+
+```
+
+
+the "rank_log2FC_averge" turned out to be non-informative, which can be best seen by the top 10 gene s according to it, and the scores they've gotten.
+
+```{r, "getting meta-tables for each of CD55",eval=FALSE}
+
+seu_patient <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd55_nk.qs")
+  output_list <- list()
+
+  options(future.globals.maxSize = 10 * 1024 * 1024 * 1024)  # 10 GB
+  
+
+
+
+for (seu in list_seu) {
+  
+  # Run one-on-one function and get output
+  output <- one_on_one(seu_patient, seu, patient_type="CD55-Def", control_type="Healthy", patient_orig_ident="Mevorach")
+  
+  
+# browser()
+ 
+  # Extract orig.ident value
+  orig_ident_value <- as.character(unique(seu$orig.ident)[1])
+
+  # Check if the orig.ident value already exists in output_list
+  if (orig_ident_value %in% names(output_list)) {
+    # If it exists, append to the existing list under that identifier
+    output_list[[orig_ident_value]] <- append(output_list[[orig_ident_value]], output[[orig_ident_value]])} else {
+    # If it does not exist, create a new entry in the list
+        output_list[[orig_ident_value]] <- output[[orig_ident_value]]
+
+  }
+}
+
+qsave(output_list,"/bigdata/bgutman/Collabs/Dror mevorach/data/output_lists/cd55_outputlist.qs")
+
+
+```
+
+
+```{r, "patient_list",eval=FALSE}
+
+patient_list <- list()
+#creating a list of all the nuroimmunulogical samples
+{
+  seu <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_esaulova.qs")
+
+
+  seu_esaulova_mog <- subset(seu, subset = sample =="mog_blood")
+# seu_esaulova_ms_1 <- subset(seu, subset = sample =="ms1_blood")
+# seu_esaulova_ms_2 <- subset(seu, subset = sample =="ms2_blood")
+# 
+# 
+# 
+#   seu <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_kang.qs")
+# 
+# 
+# 
+# seu_kang_ms_JYJ <- subset(seu, subset = sample =="JYJ")
+# seu_kang_ms_KJS <- subset(seu, subset = sample =="KJS")
+# seu_kang_ms_YYW <- subset(seu, subset = sample =="YYW")
+# 
+# 
+# 
+#   seu <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_ramesh_3.qs")
+# 
+# 
+# seu_ramesh_ms_16 <- subset(seu, subset = sample =="16")
+# seu_ramesh_ms_18 <- subset(seu, subset = sample =="18")
+# 
+# 
+#   seu <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_ramesh_5.qs")
+# 
+# 
+# seu_ramesh_nmo_5 <- subset(seu, subset = sample =="5")
+# seu_ramesh_cis_22 <- subset(seu, subset = sample =="22")
+# seu_ramesh_cis_31a <- subset(seu, subset = sample =="31a")
+# seu_ramesh_cis_31b <- subset(seu, subset = sample =="31b")
+# seu_ramesh_ms_10 <- subset(seu, subset = sample =="10")
+# seu_ramesh_ms_24 <- subset(seu, subset = sample =="24")
+# seu_ramesh_ms_25 <- subset(seu, subset = sample =="25")
+# seu_ramesh_ms_27 <- subset(seu, subset = sample =="27")
+# seu_ramesh_ms_28 <- subset(seu, subset = sample =="28")
+# seu_ramesh_ms_29 <- subset(seu, subset = sample =="29")
+# seu_ramesh_ms_6 <- subset(seu, subset = sample =="6")
+# seu_ramesh_ms_7 <- subset(seu, subset = sample =="7")
+# seu_ramesh_ms_8 <- subset(seu, subset = sample =="8")
+# seu_ramesh_ms_9 <- subset(seu, subset = sample =="9")
+# 
+# 
+# 
+#   seu <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/nks_from_other_databases/seu_schafflick.qs")
+# 
+# 
+# 
+# seu_schafflick_ms_MS19270 <- subset(seu, subset = sample =="MS19270")
+# seu_schafflick_ms_MS49131 <- subset(seu, subset = sample =="MS49131")
+# seu_schafflick_ms_MS60249 <- subset(seu, subset = sample =="MS60249")
+# seu_schafflick_ms_MS71658 <- subset(seu, subset = sample =="MS71658")
+# seu_schafflick_ms_MS74594 <- subset(seu, subset = sample =="MS74594")
+
+# Initialize the list
+patient_list <- list(
+  "seu_esaulova_mog" = list(seu = seu_esaulova_mog, condition = "MOG", dataset = "Esaulova", sample = "mog_blood")
+  # ,
+  # "seu_esaulova_ms_1" = list(seu = seu_esaulova_ms_1, condition = "MS", dataset = "Esaulova", sample = "ms1_blood"),
+  # "seu_esaulova_ms_2" = list(seu = seu_esaulova_ms_2, condition = "MS", dataset = "Esaulova", sample = "ms2_blood"),
+  # "seu_kang_ms_JYJ" = list(seu = seu_kang_ms_JYJ, condition = "MS", dataset = "Kang", sample = "JYJ"),
+  # "seu_kang_ms_KJS" = list(seu = seu_kang_ms_KJS, condition = "MS", dataset = "Kang", sample = "KJS"),
+  # "seu_kang_ms_YYW" = list(seu = seu_kang_ms_YYW, condition = "MS", dataset = "Kang", sample = "YYW"),
+  # "seu_ramesh_ms_16" = list(seu = seu_ramesh_ms_16, condition = "MS", dataset = "Ramesh_3", sample = "16"),
+  # "seu_ramesh_ms_18" = list(seu = seu_ramesh_ms_18, condition = "MS", dataset = "Ramesh_3", sample = "18"),
+  # "seu_ramesh_nmo_5" = list(seu = seu_ramesh_nmo_5, condition = "NMO", dataset = "Ramesh_5", sample = "5"),
+  # "seu_ramesh_cis_22" = list(seu = seu_ramesh_cis_22, condition = "CIS", dataset = "Ramesh_5", sample = "22"),
+  # "seu_ramesh_cis_31a" = list(seu = seu_ramesh_cis_31a, condition = "CIS", dataset = "Ramesh_5", sample = "31a"),
+  # "seu_ramesh_cis_31b" = list(seu = seu_ramesh_cis_31b, condition = "CIS", dataset = "Ramesh_5", sample = "31b"),
+  # "seu_ramesh_ms_10" = list(seu = seu_ramesh_ms_10, condition = "MS", dataset = "Ramesh_5", sample = "10"),
+  # "seu_ramesh_ms_24" = list(seu = seu_ramesh_ms_24, condition = "MS", dataset = "Ramesh_5", sample = "24"),
+  # "seu_ramesh_ms_25" = list(seu = seu_ramesh_ms_25, condition = "MS", dataset = "Ramesh_5", sample = "25"),
+  # "seu_ramesh_ms_27" = list(seu = seu_ramesh_ms_27, condition = "MS", dataset = "Ramesh_5", sample = "27"),
+  # "seu_ramesh_ms_28" = list(seu = seu_ramesh_ms_28, condition = "MS", dataset = "Ramesh_5", sample = "28"),
+  # "seu_ramesh_ms_29" = list(seu = seu_ramesh_ms_29, condition = "MS", dataset = "Ramesh_5", sample = "29"),
+  # "seu_ramesh_ms_6" = list(seu = seu_ramesh_ms_6, condition = "MS", dataset = "Ramesh_5", sample = "6"),
+  # "seu_ramesh_ms_7" = list(seu = seu_ramesh_ms_7, condition = "MS", dataset = "Ramesh_5", sample = "7"),
+  # "seu_ramesh_ms_8" = list(seu = seu_ramesh_ms_8, condition = "MS", dataset = "Ramesh_5", sample = "8"),
+  # "seu_ramesh_ms_9" = list(seu = seu_ramesh_ms_9, condition = "MS", dataset = "Ramesh_5", sample = "9"),
+  # "seu_schafflick_ms_MS19270" = list(seu = seu_schafflick_ms_MS19270, condition = "MS", dataset = "Schafflick", sample = "MS19270"),
+  # "seu_schafflick_ms_MS49131" = list(seu = seu_schafflick_ms_MS49131, condition = "MS", dataset = "Schafflick", sample = "MS49131"),
+  # "seu_schafflick_ms_MS60249" = list(seu = seu_schafflick_ms_MS60249, condition = "MS", dataset = "Schafflick", sample = "MS60249"),
+  # "seu_schafflick_ms_MS71658" = list(seu = seu_schafflick_ms_MS71658, condition = "MS", dataset = "Schafflick", sample = "MS71658"),
+  # "seu_schafflick_ms_MS74594" = list(seu = seu_schafflick_ms_MS74594, condition = "MS", dataset = "Schafflick", sample = "MS74594")
+)
+
+
+
+ rm(seu)
+ rm(list = c(
+  # "seu_esaulova_mog",
+  # "seu_esaulova_ms_1",
+  # "seu_esaulova_ms_2",
+  "seu_kang_ms_JYJ",
+  "seu_kang_ms_KJS",
+  "seu_kang_ms_YYW",
+  "seu_ramesh_ms_16",
+  "seu_ramesh_ms_18",
+  "seu_ramesh_nmo_5",
+  "seu_ramesh_cis_22",
+  "seu_ramesh_cis_31a",
+  "seu_ramesh_cis_31b",
+  "seu_ramesh_ms_10",
+  "seu_ramesh_ms_24",
+  "seu_ramesh_ms_25",
+  "seu_ramesh_ms_27",
+  "seu_ramesh_ms_28",
+  "seu_ramesh_ms_29",
+  "seu_ramesh_ms_6",
+  "seu_ramesh_ms_7",
+  "seu_ramesh_ms_8",
+  "seu_ramesh_ms_9",
+  "seu_schafflick_ms_MS19270",
+  "seu_schafflick_ms_MS49131",
+  "seu_schafflick_ms_MS60249",
+  "seu_schafflick_ms_MS71658",
+  "seu_schafflick_ms_MS74594"
+))
+
+ gc()
+
+}
+
+
+
+
+
+
+```
+
+
+```{r, "getting meta-tables for each of the neuro immunulogical conditions",eval=FALSE}
+
+  options(future.globals.maxSize = 800 * 1024 * 1024 * 1024)  # 80 GB
+  
+seu_cd55 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd55_nk.qs")
+
+seu_cd59 <-qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd59_nk.qs")
+
+
+#List of all the Seurat objects
+list_seu <- list(
+  "seu_cd55" = seu_cd55,
+  "seu_cd59" = seu_cd59)
+
+for (current_seu_patient in patient_list)
+{
+  seu_patient <- current_seu_patient$seu
+    output_list <- list()
+
+  
+  for (seu in list_seu) {
+  
+  # Run one-on-one function and get output
+  output <- one_on_one(seu_patient, seu, patient_type=current_seu_patient$condition, control_type="Healthy", patient_orig_ident=current_seu_patient$dataset)
+  
+  
+# browser()
+ 
+  # Extract orig.ident value
+  orig_ident_value <- as.character(unique(seu$orig.ident)[1])
+
+  # Check if the orig.ident value already exists in output_list
+  if (orig_ident_value %in% names(output_list)) {
+    # If it exists, append to the existing list under that identifier
+    output_list[[orig_ident_value]] <- append(output_list[[orig_ident_value]], output[[orig_ident_value]])} else {
+    # If it does not exist, create a new entry in the list
+        output_list[[orig_ident_value]] <- output[[orig_ident_value]]
+
+  }
+  }
+  
+# output_dir <- paste0("/bigdata/bgutman/Collabs/Dror mevorach/data/output_lists/",current_seu_patient$condition,"_",current_seu_patient$dataset,"_",current_seu_patient$sample,"_outputlist_2.qs")
+# 
+#                        
+# qsave(output_list,output_dir)
+print(paste("just finished",output_dir))
+gc()
+    
+}
+
+
+```
+
+
+
+
+
+
+```{r, "getting meta-tables for each of the neuro immunulogical conditions",eval=FALSE}
+
+  options(future.globals.maxSize = 800 * 1024 * 1024 * 1024)  # 80 GB
+  
+
+
+for (current_seu_patient in patient_list)
+{
+  seu_patient <- current_seu_patient$seu
+    output_list <- list()
+
+  
+  for (seu in list_seu) {
+  
+  # Run one-on-one function and get output
+  output <- one_on_one(seu_patient, seu, patient_type=current_seu_patient$condition, control_type="Healthy", patient_orig_ident=current_seu_patient$dataset)
+  
+  
+# browser()
+ 
+  # Extract orig.ident value
+  orig_ident_value <- as.character(unique(seu$orig.ident)[1])
+
+  # Check if the orig.ident value already exists in output_list
+  if (orig_ident_value %in% names(output_list)) {
+    # If it exists, append to the existing list under that identifier
+    output_list[[orig_ident_value]] <- append(output_list[[orig_ident_value]], output[[orig_ident_value]])} else {
+    # If it does not exist, create a new entry in the list
+        output_list[[orig_ident_value]] <- output[[orig_ident_value]]
+
+  }
+  }
+  
+output_dir <- paste0("/bigdata/bgutman/Collabs/Dror mevorach/data/output_lists/",current_seu_patient$condition,"_",current_seu_patient$dataset,"_",current_seu_patient$sample,"_outputlist.qs")
+
+                       
+qsave(output_list,output_dir)
+print(paste("just finished",output_dir))
+gc()
+    
+}
+
+
+```
+
+```{r, "table for the plots",eval=FALSE}
+
+
+
+# output_list <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/output_lists/cd59_output_list.qs")
+# meta_table <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/meta_tables/cd59_meta_table.qs")
+
+
+get_table_for_forest <- function(output_list, gene) {
+  
+  # Initialize an empty data frame with specified columns
+  forest_table <- data.frame(
+    dataset = character(),
+    sample = character(),
+    avg_log2FC = numeric(),
+    pct_2 = numeric(),
+    CI_lower = numeric(),
+    CI_upper = numeric(),
+    stringsAsFactors = FALSE
+  )
+  
+  # Loop through datasets in the output_list
+  for (dataset_name in names(output_list)) {
+    dataset <- output_list[[dataset_name]]
+    
+    # Loop through samples within the dataset
+    for (sample_name in names(dataset)) {
+      sample <- dataset[[sample_name]]
+      
+      # Extract the final_table and check if the gene exists
+      final_table <- sample$final_table
+      
+      if (gene %in% rownames(final_table)) {
+        # Gene exists in the final_table, extract the values
+        filtered_table <- final_table %>%
+          filter(rownames(.) == gene)
+        
+        # Calculate SE and CI
+        avg_log2FC <- filtered_table$avg_log2FC[1]
+        p_value <- filtered_table$p_val[1]
+        SE <- abs(avg_log2FC) / qnorm(1 - p_value / 2)  # Standard error approximation
+        CI_lower <- avg_log2FC - 1.96 * SE
+        CI_upper <- avg_log2FC + 1.96 * SE
+        
+        forest_table <- rbind(
+          forest_table,
+          data.frame(
+            dataset = dataset_name,
+            sample = sample_name,
+            avg_log2FC = avg_log2FC,
+            pct_2 = filtered_table$pct.2[1],
+            CI_lower = CI_lower,
+            CI_upper = CI_upper,
+            stringsAsFactors = FALSE
+          )
+        )
+      } else {
+        # Gene does not exist, append default values
+        forest_table <- rbind(
+          forest_table,
+          data.frame(
+            dataset = dataset_name,
+            sample = sample_name,
+            avg_log2FC = NULL,
+            pct_2 = 0,
+            CI_lower = 0,
+            CI_upper = 0,
+            stringsAsFactors = FALSE
+          )
+        )
+      }
+    }
+  }
+
+# a loop for finding the pct.1 
+
+  for (dataset_name in names(output_list)) {
+    dataset <- output_list[[dataset_name]]
+    
+    # Loop through samples within the dataset
+    for (sample_name in names(dataset)) {
+      sample <- dataset[[sample_name]]
+      
+      # Extract the final_table and check if the gene exists
+      final_table <- sample$final_table
+      
+      if (gene %in% rownames(final_table)) {
+                filtered_table <- final_table %>%
+          filter(rownames(.) == gene)
+        pct_1 = filtered_table$pct.1[1]
+          break
+        }
+      }
+    }
+  
+  #adding pct_1 for all the rows
+  forest_table$pct_1 <- pct_1
+  # Return the resulting data frame
+  return(forest_table)
+}
+
+# create_forest_plot - horizontal
+{
+#   create_forest_plot <- function(forest_table, gene) {
+#   
+#   # Order the rows by avg_log2FC
+#   forest_table <- forest_table[order(forest_table$avg_log2FC, decreasing = FALSE), ]
+#   forest_table$sample <- factor(forest_table$sample, levels = forest_table$sample)  # Set factor levels to ensure proper ordering
+# 
+#   plot_title <- paste("Forest Plot for the Gene", gene, "Across", nrow(forest_table), "Patients (Pct.1 =", round(unique(forest_table$pct_1)[1], 3), ")")
+# 
+#   # Determine x-axis lines and breaks
+#   x_lines <- c()
+#   if (any(forest_table$avg_log2FC > 0)) {
+#     x_lines <- c(x_lines, 1.5)
+#   }
+#   if (any(forest_table$avg_log2FC < 0)) {
+#     x_lines <- c(x_lines, -1.5)
+#   }
+# 
+#   # Create the forest plot
+#   forest_plot <- ggplot(forest_table, aes(x = avg_log2FC, y = sample)) +
+#     geom_point(aes(size = pct_2, color = dataset), shape = 16, alpha = 0.8) +
+#     geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper), height = 0.2, color = "black") +  # Add CI lines
+#     geom_vline(xintercept = x_lines, linetype = "dashed", color = "black", size = 0.8) +  # Add conditional dashed lines
+#     scale_size_continuous(range = c(3, 8)) +  # Adjust point size scale for visibility
+#     scale_x_continuous(breaks = c(scales::pretty_breaks(n = 10)(forest_table$avg_log2FC), x_lines)) +  # Ensure lines appear on x-axis
+#     theme_minimal() +  # Minimalistic theme
+#     theme(
+#       axis.title.y = element_blank(),  # Remove y-axis title
+#       axis.text.y = element_text(size = 10),  # Adjust y-axis text size
+#       axis.text.x = element_text(size = 12),  # Adjust x-axis text size
+#       legend.title = element_text(size = 12),  # Adjust legend title size
+#       legend.text = element_text(size = 10),  # Adjust legend text size
+#       plot.title = element_text(hjust = 0.5, size = 14)  # Center and adjust title size
+#     ) +
+#     xlab("Log2 Fold Change") +  # X-axis label
+#     ggtitle(plot_title) +  # Set plot title
+#     scale_color_manual(values = c("#ffc857", "#e9724c", "#c5283d", "#481d24", "#976391", "#255f85", "#2a9d8f", "#283618", "#606c38")
+#     ) +  # Add custom colors
+#     guides(
+#       size = guide_legend(title = "pct.2"),
+#       color = guide_legend(title = "Dataset")
+#     )
+#   
+#   # Print the plot
+#   return(forest_plot)
+# }
+
+}
+
+# create_forest_plot - vertical
+create_forest_plot <- function(forest_table, gene) {
+  
+  # Order the rows by avg_log2FC
+  forest_table <- forest_table[order(forest_table$avg_log2FC, decreasing = FALSE), ]
+  forest_table$sample <- factor(forest_table$sample, levels = forest_table$sample)  # Set factor levels to ensure proper ordering
+
+  plot_title <- paste("Forest Plot for the Gene", gene, "Across", nrow(forest_table), "Patients (Pct.1 =", round(unique(forest_table$pct_1)[1], 3), ")")
+
+  # Determine x-axis lines and breaks
+  y_lines <- c()
+  if (any(forest_table$avg_log2FC > 0)) {
+    y_lines <- c(y_lines, 1.5)
+  }
+  if (any(forest_table$avg_log2FC < 0)) {
+    y_lines <- c(y_lines, -1.5)
+  }
+
+  # Create the vertical forest plot
+  forest_plot <- ggplot(forest_table, aes(y = avg_log2FC, x = sample)) +
+    geom_point(aes(size = pct_2, color = dataset), shape = 16, alpha = 0.8) +
+    geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), width = 0.2, color = "black") +  # Add CI lines
+    geom_hline(yintercept = y_lines, linetype = "dashed", color = "black", size = 0.8) +  # Add conditional dashed lines
+    scale_size_continuous(range = c(3, 8)) +  # Adjust point size scale for visibility
+    scale_y_continuous(breaks = c(scales::pretty_breaks(n = 10)(forest_table$avg_log2FC), y_lines)) +  # Ensure lines appear on y-axis
+    theme_minimal() +  # Minimalistic theme
+    theme(
+      axis.title.x = element_blank(),  # Remove x-axis title
+      axis.text.x = element_text(size = 10, angle = 45, hjust = 1),  # Adjust x-axis text size and orientation
+      axis.text.y = element_text(size = 12),  # Adjust y-axis text size
+      legend.title = element_text(size = 12),  # Adjust legend title size
+      legend.text = element_text(size = 10),  # Adjust legend text size
+      plot.title = element_text(hjust = 0.5, size = 14)  # Center and adjust title size
+    ) +
+    ylab("Log2 Fold Change") +  # Y-axis label
+    ggtitle(plot_title) +  # Set plot title
+    scale_color_manual(values = c("#ffc857", "#e9724c", "#c5283d", "#481d24", "#976391", "#255f85", "#2a9d8f", "#283618", "#606c38")
+    ) +  # Add custom colors
+    guides(
+      size = guide_legend(title = "pct.2"),
+      color = guide_legend(title = "Dataset")
+    )
+  
+  # Print the plot
+  return(forest_plot)
+}
+
+genes_of_interest<- c("HLA-G","CD27","S100B", "CXCR4","KLRD1","LY6E")
+
+for (gene in genes_of_interest) {
+  forest_table <- get_table_for_forest(output_list, gene)
+  plot <- create_forest_plot(forest_table, gene)
+  print(plot)
+}
+
+
+
+
+
+```
+
+
+```{r, "january 25th",eval=FALSE}
+
+
+output_list <- qread("C:/Users/barak/Downloads/redearch/cd59_output_list.qs")
+
+meta_table <- qread("C:/Users/barak/Downloads/redearch/cd59_meta_table.qs")
+
+# list_seu <- qread("C:/Users/barak/Downloads/redearch/list_seu.qs")
+
+# seu_cd59_nk <- qread("C:/Users/barak/Downloads/redearch/seu_cd59_nk.qs")
+
+
+#Lets isolate the S100B community
+
+# seu_cd59_nk <- qread("C:/Users/barak/Downloads/redearch/seu_cd59_nk.qs")
+
+#markers for display
+
+#Creating a seurat object just for the CD59_def_Nks
+{
+  seu_cd59_nk <- subset(seu_cd59_nk,subset = condition == "CD59-Def")
+seu_cd59_nk <- SCTransform(seu_cd59_nk, vars.to.regress = "percent_mito", verbose = TRUE)
+
+seu_cd59_nk <- RunPCA(seu_cd59_nk, verbose = FALSE)
+ElbowPlot(seu_cd59_nk)
+
+
+seu_cd59_nk <- FindNeighbors(seu_cd59_nk, dims = 1:20, verbose = FALSE)
+seu_cd59_nk <- FindClusters(seu_cd59_nk, verbose = FALSE, resolution = 0.5)
+
+seu_cd59_nk <- RunUMAP(seu_cd59_nk, dims = 1:10, verbose = FALSE, min.dist = 2)
+
+DimPlot(seu_cd59_nk, reduction = "umap")
+
+
+seu_cd59_nk <- RunUMAP(
+  object = seu_cd59_nk,
+  dims = 1:10,
+  n.neighbors = 50,     # More neighbors for global structure
+  min.dist = 0.05,      # Tighter clusters
+  spread = 2            # Slightly spread out clusters
+)
+DimPlot(seu_cd59_nk, reduction = "umap")
+
+  
+}
+
+
+
+
+
+
+markers <- list()
+markers$NK <- c("CD3G-", "CD3D-", "CD3E-" 
+, "CD14-","CD19−", "CD7+","PTPRC +", "NCAM1 +")
+# PTPRC = CD45
+#NCAM1 = CD56
+markers$vivers_positive_nk_signature <- c("CD160+", "CD244+", "CHST12+", "CST7+", "GNLY+", "IL18RAP+", "IL2RB+", "KLRC1+", "KLRC3+", "KLRD1+", "KLRF1+", "PRF1+", "XCL2+")
+markers$S100B <- "S100B+"
+
+seu_cd59_nk <- AddModuleScore_UCell(seu_cd59_nk, features = markers)
+
+seu_cd59_nk$S100B_status <- ifelse()
+
+FeaturePlot_nk <- FeaturePlot_scCustom(seurat_object = seu_cd59_nk, features = "NK_UCell")  + ggtitle("NK_Markers") +
+  theme(plot.title = element_text(face = "plain", size = 12))
+
+FeaturePlot_vivers_positive_nk_signature  <- FeaturePlot_scCustom(seurat_object = seu_cd59_nk, features = "vivers_positive_nk_signature_UCell")  + ggtitle("Vivers_Positive_NK_Signature") +
+  theme(plot.title = element_text(face = "plain", size = 12))
+
+FeaturePlot_S100B_UCell  <- FeaturePlot_scCustom(seurat_object = seu_cd59_nk, features = "S100B_UCell")  + ggtitle("S100B_Expression") +
+  theme(plot.title = element_text(face = "plain", size = 12))
+
+print(FeaturePlot_nk)
+print(FeaturePlot_vivers_positive_nk_signature)
+print(FeaturePlot_S100B_UCell)
+
+DotPlot(seu_cd59_nk, features = c("CD3G", "CD3D", "CD3E", 
+                "CD14", "CD19", "CD7", "PTPRC", "NCAM1"),group.by = "seurat_clusters") + RotatedAxis()
+
+DotPlot(seu_cd59_nk, features = c("CD160", "CD244", "CHST12", "CST7", "GNLY", 
+                                          "IL18RAP", "IL2RB", "KLRC1", "KLRC3", 
+                                          "KLRD1", "KLRF1", "PRF1", "XCL2"),group.by = "seurat_clusters") + RotatedAxis()
+
+
+DotPlot(seu_cd59_nk, features = c("S100B"),group.by = "seurat_clusters") + RotatedAxis()
+
+
+
+
+```
+
+
+
+
+# Redundent code
+
+```{r, "Getting rid of rank_log2FC_averge",eval=FALSE}
+
+
+try <- meta_table %>%
+  dplyr::arrange(rank_log2FC_averge) %>%  
+  head(10) %>%  
+  dplyr::select(rank_log2FC_averge)  
+
+
+print(try)
+
+
+meta_table <- meta_table %>% filter(gene_count > 9) 
+
+#Keep only the relevant 6 columns
+meta_table <- meta_table %>% dplyr::select("gene_count", "fisher", "avg_log2FC_averge", "avg_pct_dif",                       "percent_significant_pct_patient_threshold", "percent_significant_pct_patient_q3", "percent_significant_pct_patient_q3_1_5_iqr", "percent_significant_pct_control_threshold","percent_significant_pct_control_q3","percent_significant_pct_control_q3_1_5_iqr")
+
+
+meta_table <- meta_table %>%
+  rename(avg_log2FC = avg_log2FC_averge)
+
+qsave(meta_table,"/bigdata/bgutman/Collabs/Dror mevorach/data/meta_table.qs")
+
+
+```
+
+
+We can observe that these are meaningless genes and that thier scores (which should be the lowest) aren't that small by themselves.
+
+
+```{r, "Modifying_meta_table",eval=FALSE}
+
+
+#Let's remove all the genes that appear in 9 tables or less
+  
+
+
+#creating correlation heatmap for all the 10 methods, showing they are indeed independent
+{
+
+
+
+correlation_matrix <- cor(meta_table, use = "pairwise.complete.obs")
+
+# Create a heatmap with ComplexHeatmap
+heatmap <- Heatmap(
+  correlation_matrix,
+  name = "Correlation",
+  column_title = "Correlation Between Methods",
+  row_names_side = "left",
+  column_names_rot = 45,      # Rotate column names
+  col = colorRampPalette(c("blue", "white", "red"))(50)
+)
+
+print(heatmap)
+  
+}
+
+
+
+
+```
+
+
+
+Using the IQR provides a data-driven, context-aware threshold that adjusts to the variability in the specific dataset.
+```{r, "scttaer_plots_no_SD_few_genes_size_gene_count"}
+
+
+meta_table <- meta_table %>%
+  rownames_to_column(var = "gene_name") 
+
+
+
+significant_genes_p_scatter_avg_log2fc_highlight <- c("HLA-G", "CD3G", "TRDC", "IFITM1", "CXCR4","TNFAIP3","KLRC3")
+
+ 
+p_scatter_avg_log2fc_highlight <- ggplot(meta_table, aes(x = avg_log2FC, y = fisher, size = gene_count)) +
+  geom_point(aes(color = ifelse(gene_name %in% significant_genes_p_scatter_avg_log2fc_highlight, "highlight", "default")), 
+             alpha = 0.7) +
+  scale_color_manual(values = c("default" = "grey", "highlight" = "red"), guide = "none") +
+  geom_text_repel(
+    data = meta_table %>% filter(gene_name %in% significant_genes_p_scatter_avg_log2fc_highlight ),
+    aes(label = gene_name),
+    size = 5, color = "blue",
+    max.overlaps = 15
+  ) +
+  scale_size_continuous(name = "Gene Count") +
+  labs(
+    title = "Fisher Score vs. Avg Log2FC - Highlight genes",
+    x = "Avg Log2FC",
+    y = "Fisher Score"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "right"
+  )
+ 
+ 
+top_30_genes <- meta_table %>%
+  filter((avg_log2FC > 1.5 )) %>%
+   dplyr::arrange(-fisher) %>%  
+  head(20) %>%
+    pull(gene_name)
+
+
+bottom_30_genes <- meta_table %>%
+  filter((avg_log2FC < - 1.5 )) %>%
+   dplyr::arrange(-fisher) %>%  
+  head(20) %>%
+   filter (!gene_name %in% top_30_genes) %>%
+    pull(gene_name)
+
+ significant_genes_p_scatter_avg_log2fc <- c(top_30_genes, bottom_30_genes)  
+
+p_scatter_avg_log2fc <- ggplot(meta_table, aes(x = avg_log2FC, y = fisher, size = gene_count)) +
+  geom_point(aes(color = ifelse(gene_name %in% significant_genes_p_scatter_avg_log2fc, "highlight", "default")), 
+             alpha = 0.7) +
+  scale_color_manual(values = c("default" = "grey", "highlight" = "red"), guide = "none") +
+  geom_text_repel(
+    data = meta_table %>% filter(gene_name %in% significant_genes_p_scatter_avg_log2fc ),
+    aes(label = gene_name),
+    size = 5, color = "blue",
+    max.overlaps = 15
+  ) +
+  scale_size_continuous(name = "Gene Count") +
+  labs(
+    title = "Fisher Score vs. Avg Log2FC",
+    x = "Avg Log2FC",
+    y = "Fisher Score"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "right"
+  )
+
+
+
+# # Save the plots to files
+# ggsave("fisher_vs_avg_log2FC.png", plot1, width = 8, height = 6, dpi = 300)
+# ggsave("fisher_vs_avg_rank_log2FC.png", plot2, width = 8, height = 6, dpi = 300)
+
+# Display the plots
+print(p_scatter_avg_log2fc_highlight)
+print(p_scatter_avg_log2fc)
+
+
+
+```
+
+
+```{r, "scttaer_plots_no_SD_few_genes_size_gene_count"}
+
+
+ 
+top_30_genes <- meta_table %>%
+  filter((avg_log2FC > 1.5 )) %>%
+   dplyr::arrange(-avg_pct_dif) %>%  
+  head(20) %>%
+    pull(gene_name)
+
+
+bottom_30_genes <- meta_table %>%
+  filter((avg_log2FC < - 1.5 )) %>%
+   dplyr::arrange(-avg_pct_dif) %>%  
+  head(20) %>%
+   filter (!gene_name %in% top_30_genes) %>%
+    pull(gene_name)
+
+ significant_genes_p_scatter_avg_log2fc <- c(top_30_genes, bottom_30_genes)
+ 
+
+p_scatter_avg_log2fc <- ggplot(meta_table, aes(x = avg_log2FC, y = percent_significant_pct_patient_threshold, size = gene_count)) +
+  geom_point(aes(color = ifelse(gene_name %in% significant_genes_p_scatter_avg_log2fc, "highlight", "default")), 
+             alpha = 0.7) +
+  scale_color_manual(values = c("default" = "grey", "highlight" = "red"), guide = "none") +
+  geom_text_repel(
+    data = meta_table %>% filter(gene_name %in% significant_genes_p_scatter_avg_log2fc ),
+    aes(label = gene_name),
+    size = 5, color = "blue",
+    max.overlaps = 15
+  ) +
+  scale_size_continuous(name = "Gene Count") +
+  labs(
+    title = "Fisher Score vs. Avg pct Diff",
+    x = "Avg Log2FC",
+    y = "Avg pct diff"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "right"
+  )
+
+
+
+# # Save the plots to files
+# ggsave("fisher_vs_avg_log2FC.png", plot1, width = 8, height = 6, dpi = 300)
+# ggsave("fisher_vs_avg_rank_log2FC.png", plot2, width = 8, height = 6, dpi = 300)
+
+# Display the plots
+print(p_scatter_avg_log2fc)
+
+
+
+```
+
+
+
+
+We observe that both avg_log2FC and avg_rank_log2FC identify meaningful genes associated with the patient and the control. As expected, the Fisher score correlates with the gene count.
+
+Interestingly, while the rank plot highlights more genes associated with the patient, the average rank of the top 30 genes is not particularly high. Excluding the first gene (the redundant MTRNR2L1), the range spans from 48 to 2346, with most of these 30 genes having an average rank between 100 and 1200. This highlights the need for a better method to account for rank beyond simple averaging.
+
+
+
+```{r, "scttaer_plots_no_SD_many_genes_size_gene_count"}
+
+
+
+top_30_genes <- meta_table %>%
+  filter(fisher > 800) %>%
+  arrange(avg_rank_log2FC) %>%
+  head(30) %>%
+  pull(gene_name)
+
+bottom_30_genes <- meta_table %>%
+  filter(fisher > 800 & !gene_name %in% top_30_genes) %>%
+  arrange(desc(avg_rank_log2FC)) %>%
+  head(30) %>%
+  pull(gene_name)
+
+# Combine the two lists
+significant_genes <- c(top_30_genes, bottom_30_genes)
+
+
+p_scatter_avg_log2fc <- ggplot(meta_table, aes(x = avg_log2FC, y = fisher, size = gene_count)) +
+  geom_point(aes(color = ifelse((avg_log2FC > 1.5 | avg_log2FC < -1.5) & fisher > 800, "highlight", "default")), 
+             alpha = 0.7) +
+  scale_color_manual(values = c("default" = "grey", "highlight" = "red"), guide = "none") +
+  geom_text_repel(
+    data = meta_table %>% filter((avg_log2FC > 1.5 | avg_log2FC < -1.5) & fisher > 800),
+    aes(label = gene_name),
+    size = 5, color = "blue",
+    max.overlaps = 15
+  ) +
+  scale_size_continuous(name = "Gene Count") +
+  labs(
+    title = "Fisher Score vs. Avg Log2FC",
+    x = "Avg Log2FC",
+    y = "Fisher Score"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "right"
+  )
+
+p_scatter_fisher_avg_rang_log2fc <- ggplot(meta_table, aes(x = avg_rank_log2FC, y = fisher, size = gene_count)) +
+  geom_point(aes(color = ifelse(gene_name %in% significant_genes, "highlight", "default")), alpha = 0.7) +
+  scale_color_manual(values = c("default" = "grey", "highlight" = "red"), guide = "none") +
+  geom_text_repel(
+    data = meta_table %>% filter(gene_name %in% significant_genes),
+    aes(label = gene_name),
+    size = 5, color = "blue",
+    max.overlaps = 15
+  ) +
+  scale_size_continuous(name = "Gene Count") +
+  labs(
+    title = "Fisher Score vs. Avg Rank Log2FC",
+    x = "Avg Rank Log2FC",
+    y = "Fisher Score"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "right"
+  )
+
+
+# # Save the plots to files
+# ggsave("fisher_vs_avg_log2FC.png", plot1, width = 8, height = 6, dpi = 300)
+# ggsave("fisher_vs_avg_rank_log2FC.png", plot2, width = 8, height = 6, dpi = 300)
+
+# Display the plots
+print(p_scatter_avg_log2fc)
+print(p_scatter_fisher_avg_rang_log2fc)
+
+
+
+```
+
+Here, we observe that while the plots do highlight meaningful genes, they also identify redundant ones. Unfortunately, these redundancies persist even after removing housekeeping genes and other non-meaningful ones.
+
+ 
+
+
+```{r, "scttaer_plots_many_genes_size_SD"}
+
+
+
+
+
+top_30_genes <- meta_table %>%
+  filter(fisher > 800) %>%
+  arrange(avg_rank_log2FC) %>%
+  head(30) %>%
+  pull(gene_name)
+
+bottom_30_genes <- meta_table %>%
+  filter(fisher > 800 & !gene_name %in% top_30_genes) %>%
+  arrange(desc(avg_rank_log2FC)) %>%
+  head(30) %>%
+  pull(gene_name)
+
+# Combine the two lists
+significant_genes <- c(top_30_genes, bottom_30_genes)
+
+
+p_scatter_avg_log2fc <- ggplot(meta_table, aes(x = avg_log2FC, y = fisher, size = `1/SD_log2FC`)) +
+  geom_point(aes(color = ifelse((avg_log2FC > 1.5 | avg_log2FC < -1.5) & fisher > 800, "highlight", "default")), 
+             alpha = 0.7) +
+  scale_color_manual(values = c("default" = "grey", "highlight" = "red"), guide = "none") +
+  geom_text_repel(
+    data = meta_table %>% filter((avg_log2FC > 1.5 | avg_log2FC < -1.5) & fisher > 800),
+    aes(label = gene_name),
+    size = 5, color = "blue",
+    max.overlaps = 15
+  ) +
+  scale_size_continuous(name = "1/SD_log2FC") +
+  labs(
+    title = "Fisher Score vs. Avg Log2FC",
+    x = "Avg Log2FC",
+    y = "Fisher Score"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "right"
+  )
+
+
+
+p_scatter_fisher_avg_rang_log2fc <- ggplot(meta_table, aes(x = avg_rank_log2FC, y = fisher, size = `1/SD_rank_log2FC`)) +
+  geom_point(aes(color = ifelse(gene_name %in% significant_genes, "highlight", "default")), alpha = 0.7) +
+  scale_color_manual(values = c("default" = "grey", "highlight" = "red"), guide = "none") +
+  geom_text_repel(
+    data = meta_table %>% filter(gene_name %in% significant_genes),
+    aes(label = gene_name),
+    size = 5, color = "blue",
+    max.overlaps = 15
+  ) +
+  scale_size_continuous(name = "1/SD_rank_log2FC") +
+  labs(
+    title = "Fisher Score vs. Avg Rank Log2FC",
+    x = "Avg Rank Log2FC",
+    y = "Fisher Score"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "right"
+  )
+
+
+# # Save the plots to files
+# ggsave("fisher_vs_avg_log2FC.png", plot1, width = 8, height = 6, dpi = 300)
+# ggsave("fisher_vs_avg_rank_log2FC.png", plot2, width = 8, height = 6, dpi = 300)
+
+# Display the plots
+print(p_scatter_avg_log2fc)
+print(p_scatter_fisher_avg_rang_log2fc)
+
+
+
+```
+
+These are the same plots as before only this time, size of the dots is their 1/SD. We can see that there is no correlation between the 1/SD to the fisher/two averages.  
+
+```{r, "scttaer_plots_SD_few_genes_size_gene_count"}
+
+
+significant_genes_p_scatter_fisher_avg_rank_log2fc <- meta_table %>%
+  arrange(desc(`1/SD_rank_log2FC`)) %>%
+  head(20) %>%
+  pull(gene_name)
+
+significant_genes_p_scatter_avg_log2fc <- meta_table %>%
+  filter((avg_log2FC > 1 | avg_log2FC < -1) & `1/SD_log2FC` > 3.5) %>%
+  pull(gene_name)
+
+
+
+
+
+p_scatter_sd_avg_log2fc <- ggplot(meta_table, aes(x = avg_log2FC, y = `1/SD_log2FC`, size = gene_count)) +
+    geom_point(aes(color = ifelse(gene_name %in% significant_genes_p_scatter_avg_log2fc, "highlight", "default")), 
+               alpha = 0.7) +
+    scale_color_manual(values = c("default" = "grey", "highlight" = "red"), guide = "none") +
+    geom_text_repel(
+        data = meta_table %>% filter(gene_name %in% significant_genes_p_scatter_avg_log2fc),
+        aes(label = gene_name),
+        size = 5, color = "blue",
+        max.overlaps = 15
+    ) +
+    scale_size_continuous(name = "Gene Count") +
+    labs(
+        title = "1/SD_log2FC vs. Avg Log2FC",  
+        x = "Avg Log2FC",
+        y = "1/SD_log2FC"
+    ) +
+    theme_minimal(base_size = 15) +
+    theme(
+        plot.title = element_text(face = "bold", hjust = 0.5, size = 18),
+        axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.position = "right"
+    )
+
+
+
+p_scatter_sd_rank_log2fc <- ggplot(meta_table, aes(x = avg_rank_log2FC, y = `1/SD_rank_log2FC`, size = gene_count)) +
+  geom_point(aes(color = ifelse(gene_name %in% significant_genes_p_scatter_fisher_avg_rank_log2fc, "highlight", "default")), alpha = 0.7) +
+  scale_color_manual(values = c("default" = "grey", "highlight" = "red"), guide = "none") +
+  geom_text_repel(
+    data = meta_table %>% filter(gene_name %in% significant_genes_p_scatter_fisher_avg_rank_log2fc),
+    aes(label = gene_name),
+    size = 5, color = "blue",
+    max.overlaps = 15
+  ) +
+  scale_size_continuous(name = "Gene Count") +
+  labs(
+    title = "1/SD_rank_log2FCvs. Avg Log2FC",
+    x = "Avg Rank Log2FC",
+    y = "1/SD_rank_log2FC"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 18),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "right"
+  )
+
+
+# # Save the plots to files
+# ggsave("fisher_vs_avg_log2FC.png", plot1, width = 8, height = 6, dpi = 300)
+# ggsave("fisher_vs_avg_rank_log2FC.png", plot2, width = 8, height = 6, dpi = 300)
+
+# Display the plots
+print(p_scatter_sd_avg_log2fc)
+print(p_scatter_sd_rank_log2fc)
+
+
+
+```
+
+
+
+The differences in ranking scales between the two SD measures stem from differences in the "measurement units" of the original metrics. Ranks emphasize relative positions and are highly sensitive to small differences. In contrast, log2FC values, being continuous, are more influenced by absolute magnitudes, which often exhibit clustering.
+
+Unfortunately, none of these plots highlight any particularly interesting genes. From the second plot, we also observe that the rank SD is very high for the vast majority of detected genes (which makes 1/SD_rank smaller). This underscores the need for a better method to account for rank SD, rather than relying on the average.
+

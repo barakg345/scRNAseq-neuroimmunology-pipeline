@@ -1,0 +1,745 @@
+```{r setup, include=FALSE}
+
+knitr::opts_knit$set(root.dir = "/bigdata/bgutman/Collabs/Dror mevorach/data/NK/healthy_nks/")
+knitr::opts_chunk$set(
+  fig.width = 13,    # Set the width of the plots in inches
+  fig.height = 10,   # Set the height of the plots in inches
+  dpi = 300,        # Set the resolution to 300 dpi
+  echo = FALSE       # Do not display the code
+
+)
+
+options(bitmapType = "cairo")          
+
+
+```
+
+```{r, "libraries and signatures", echo=FALSE}
+
+
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(Seurat)   
+  library(data.table)
+  library(cowplot)
+  library(ggplot2)
+  library(scran)
+  library(celldex)
+  library(SingleR)
+  library(tidyr)
+  library(scales)
+  library(corrplot)
+  library(magrittr)
+  library(dittoSeq)
+  library(viridis)
+  library(grid)
+  library(magrittr)
+  library(ggrepel)
+  library(glmGamPoi)
+  library(qs)
+  library(patchwork)
+  library(RColorBrewer)
+  library(Matrix)
+  library(parallel)
+  library(future)
+  library(future.apply)
+  library(GEOquery)
+  library(harmony)
+  library(ggprism)
+  library(scCustomize)
+  library(UCell)
+  library(colorspace)
+  library(SignatuR)
+  library(SCPA)
+  library(msigdbr)
+  library(ComplexHeatmap)
+  library(tidyverse)
+  library(ggpubr)
+  library(purrr)
+  library(knitr)
+  library(clusterProfiler)
+  library(enrichplot)
+  library(org.Hs.eg.db)
+  library(reshape2)
+  library(knitr)
+  library(scGate)
+  library(scater)
+  library(biomaRt)
+  library(readxl)
+  library(writexl)
+  library(jpeg)
+  library(cowplot)
+  library(gridExtra)
+  library(ggtext)
+  library(tools)
+  library(ReactomePA)
+  # library(msigdb)
+  library(GSEABase)
+  library(stringr)
+  library(circlize)
+  library(furrr) 
+  library(msigdbdf) 
+
+})
+
+
+#Prepare the sub-cell types signatures for the upcoming analyses
+
+signatures <- list(
+  classical_monocytes = c("CD14", "CCR2", "FCGR1A", "CD36", "SELL"),
+  intermediate_monocytes = c("CD14", "FCGR3A", "FCGR3B", "HLA-DRA", "HLA-DRB3", "HLA-DRB5", "HLA-DRB1", "CCR5", "CD86", "ITGAX", "CD74"),
+  non_classical_monocytes = c("FCGR3A", "FCGR3B", "CX3CR1","CXCR4", "HLA-DRA", "HLA-DRB3", "HLA-DRB5", "HLA-DRB1", "SECISBP2L"),
+  
+  CD56_bright_nk = c("NCAM1", "CCR7", "CSF2", "CXCR3", "IFNG","IL2RB", "IL7R", "KIT", "KLRC1", "KLRD1", "NCR1", "SELL"),
+  CD56_dim_nk = c("FCGR3A", "FCGR3B", "NCAM1", "CX3CR1", "CXCR1", "ITGB2", "KIR2DL1", "KIR3DL1", "KIR2DL3", "KIR2DL2",  "KLRC2", "KLRG1", "PRF1"),
+  Adaptive_NK = c("B3GAT1", "KLRC2", "LILRB1", "Klra8"),
+  
+
+  naive_b_cells = c("CD19", "IGHD", "CD38", "CD24", "CR2", "IGHM", "FCER2"),
+  non_switched_memory_b_cells = c("IGHD", "CD27", "CD38", "CD24", "CR2", "IGHM", "CD1c"),
+  exhausted_b_cells = c("CD19", "CD38", "CD24", "ITGAX", "TBX21", "FcRL4", "FcRL5"),
+  switched_memory_b_cells = c("CD27", "CD38", "CD24", "CR2", "IGHG1", "IGHG2","IGHG3", "IGHG4", "IGHA1", "IGHA2", "FAS"),
+  Plasmablasts=c("CD19", "IGHD", "CD27", "CD38", "MS4A1", "HLA-DRA", "HLA-DRB3", "HLA-DRB5", "HLA-DRB1"),
+  
+  follicular_helper_t_cells = c("CXCR5", "PDCD1", "BCL6", "ICOS", "SH2D1A", "CD40LG", "IL21", "IL10", "B3GAT1"),
+  regulatory_tcell = c("IL2RA", "FOXP3", "IL7R", "ICOS", "TNFRSF18", "CTLA4", "TIGIT", "ENTPD1", "TNFRSF9", "TNFRSF1B"),
+  th1 = c("TBX21", "STAT4", "IFNG", "IL12RB1", "IL12RB2", "CXCR3", "CCR5", "CD44", "Fas", "	IFNGR1", "HAVCR2"),
+  th17 = c("IL17A", "IL17F", "IL21", "IL22", "KLRB1", "CCR4", "CCR6", "APOD", "C1QL1", "CTSL"),
+  th2 = c("GATA3", "STAT6", "IL4", "IL5", "IL13", "CCR4", "CCR8"),
+  naive_cd4_t_cells=c("LCK", "ZAP70", "KLF2", "CD3G", "CD3D", "CD3GE", "CD28", "SELL", "PTPRC", "CD5", "CCR7", "CD27", "IL7R"),
+  terminal_effector_cd4_t_cells= c("PTPRC", "CD44", "SELL", "IL2RB", "IL2RA", "IL2RG"),
+  
+
+  naive_cd8_t_cells = c("CD27", "CD28", "PTPRC", "SELL", "CCR7", "IL7R", "CD5", "CD8A", "CD8B", "CXCR3"),
+  central_memory_cd8_t_cells = c("SELL", "CCR7", "IL7R", "CD27", "EOMES", "HNF1A", "BCL6", "ID3", "STAT3"),
+  effector_memory_cd8_t_cells = c("SELL", "CCR7", "KLRG1", "	GZMB", "TBX21", "Blimp1", "ID2", "STAT4", "ITGAE", "ITGA1", "CXCR3"),
+  terminal_effector_cd8_t_cells = c("KLRG1", "IL7R", "B3GAT1", "CXCR3", "CD27", "CD28", "IFNG", "IL2", "CDKN1B")
+)
+
+
+```
+
+```{r, "import Functions"}
+
+
+source("/bigdata/bgutman/Collabs/Dror mevorach/scripts/functions.R")
+
+
+  my_color_platte <- c(
+    "Top 20"    = "#48CAE4",
+    "Bottom 20" = "#03045e",
+    "Top 50"    = "#B2DF8A",
+    "Bottom 50" = "#2C6E49",
+    "Top 100"   = "#FF8FA3",
+    "Bottom 100"= "firebrick",
+    "Top 100"   = "#ffb703",
+    "Bottom 100"= "#fb8500",
+    "Top 100"   = "#E5E5E5",
+    "Bottom 100"= "#000000",
+    "Top 100"   = "#7C4585",
+    "Bottom 100"= "#E9A5F1", 
+    "Top 100"   = "#A76545"
+
+  )
+  
+   
+    
+```
+
+#Load data:
+```{r, "Load healthy_list: list of 12 healthy controls", eval=FALSE}
+
+# #Loading seurat objects that include healthy samples
+# relevant_datasets <- nk_prcnt %>%     filter(disease =="Healthy") %>% pull(dataset)
+
+healthy_list <- list()
+
+#Healthy controls whose NKs were obtained computanitonally 
+{
+  seu_hong <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD8_T_cells/seu_hong.qs")
+  
+  
+  seu_hong_healthy_HC_1 <- subset(seu_hong, subset = sample =="HC-1")
+    seu_hong_healthy_HC_2 <- subset(seu_hong, subset = sample =="HC-2")
+  seu_hong_healthy_HC_3 <- subset(seu_hong, subset = sample =="HC-3")
+  seu_hong_healthy_HC_4 <- subset(seu_hong, subset = sample =="HC-4")
+  seu_hong_healthy_HC_5 <- subset(seu_hong, subset = sample =="HC-5")
+
+  
+  seu_kang <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD8_T_cells/seu_kang.qs")
+  
+   seu_kang_healthy_JSB <- subset(seu_kang, subset = sample =="JSB")
+   seu_kang_healthy_KYO  <- subset(seu_kang, subset = sample =="KYO")
+
+  
+  seu_ramesh_5 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD8_T_cells/seu_ramesh.qs")
+     seu_ramesh_healthy_2 <- subset(seu_ramesh_5, subset = sample =="2")
+     seu_ramesh_healthy_3 <- subset(seu_ramesh_5, subset = sample =="3")
+
+     seu_ramesh_healthy_32 <- subset(seu_ramesh_5, subset = sample =="32")
+     
+     
+      seu_cd55 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD8_T_cells/seu_cd55.qs")
+seu_cd59 <-qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD8_T_cells/seu_cd59.qs")
+
+seu_cd55 <- subset(seu_cd55, subset = sample =="CD55-control")
+seu_cd59 <- subset(seu_cd59, subset = sample =="CD59-control")
+     
+}
+
+
+
+
+
+
+#List of all the Seurat objects
+
+healthy_list <- list(
+
+  "seu_hong_healthy_HC_1" = list(seu = seu_hong_healthy_HC_1, condition = "Healthy", dataset = "Hong", sample = "HC-1"),
+  "seu_hong_healthy_HC_2" = list(seu = seu_hong_healthy_HC_2, condition = "Healthy", dataset = "Hong", sample = "HC-2"),
+  "seu_hong_healthy_HC_3" = list(seu = seu_hong_healthy_HC_3, condition = "Healthy", dataset = "Hong", sample = "HC-3"),
+  "seu_hong_healthy_HC_4" = list(seu = seu_hong_healthy_HC_4, condition = "Healthy", dataset = "Hong", sample = "HC-4"),
+  "seu_hong_healthy_HC_5" = list(seu = seu_hong_healthy_HC_5, condition = "Healthy", dataset = "Hong", sample = "HC-5"),
+  
+  "seu_kang_healthy_JSB" = list(seu = seu_kang_healthy_JSB, condition = "Healthy", dataset = "Kang", sample = "JSB"),
+  "seu_kang_healthy_KYO" = list(seu = seu_kang_healthy_KYO, condition = "Healthy", dataset = "Kang", sample = "KYO"),
+
+  "seu_ramesh_healthy_2" = list(seu = seu_ramesh_healthy_2, condition = "Healthy", dataset = "Ramesh", sample = "2"),
+  "seu_ramesh_healthy_3" = list(seu = seu_ramesh_healthy_3, condition = "Healthy", dataset = "Ramesh", sample = "3"),
+  "seu_ramesh_healthy_32" = list(seu = seu_ramesh_healthy_32, condition = "Healthy", dataset = "Ramesh", sample = "32"),
+ 
+  "seu_mevorach_healthy_CD55_Healthy" = list(seu = seu_cd55, condition = "Healthy", dataset = "Mevorach", sample = "CD55-control"),
+  "seu_mevorach_healthy_CD59_Healthy" = list(seu = seu_cd59, condition = "Healthy", dataset = "Mevorach", sample = "CD59-control")
+
+)   
+  
+
+
+
+
+rm(
+  seu_hong_healthy_HC_1, seu_hong_healthy_HC_2, seu_hong_healthy_HC_3, seu_hong_healthy_HC_4, seu_hong_healthy_HC_5,
+  seu_kang_healthy_JSB, seu_kang_healthy_KYO,
+  seu_ramesh_healthy_2, seu_ramesh_healthy_3, seu_ramesh_healthy_32,seu_cd55, seu_cd59, seu_hong, seu_kang, seu_ramesh_5)
+
+
+gc()
+
+```
+
+```{r, "Load patient_list: list of neuroimmunulogical patients",eval=FALSE}
+
+patient_list <- list()
+#creating a list of all the nuroimmunulogical samples
+{
+ 
+
+
+seu <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/seu_cd59_CD8_T_cells.qs")
+
+
+seu_mevorach_cd59_patient <- subset(seu, subset = condition =="CD59.Def")
+
+
+
+patient_list <- list(
+)
+
+
+
+# Initialize the list
+patient_list <- list(
+      "seu_mevorach_cd59" = list(seu = seu_mevorach_cd59_patient, condition = "CD59.Def", dataset = "Mevorach", sample = "CD59_Patient")
+)
+
+
+ rm(seu)
+ rm(list = c(
+  "seu_mevorach_cd59_patient"
+))
+
+ gc()
+
+}
+
+
+
+
+```
+
+```{r, "Load healthy_list_for_integration",eval=FALSE}
+options(future.globals.maxSize = 1600 * 1024 * 1024 * 1024)  # 160 GB
+
+
+# Creating healthy_list_for_integration
+{
+  
+  healthy_list_for_integration <- list()
+  
+  #Loading datasets
+  {
+    #Healthy controls whose NKs were obtained computanitonally 
+    {
+      seu_hong <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD8_T_cells/seu_hong.qs")
+      
+      seu_hong <- subset(seu_hong, subset = condition =="Healthy")
+      
+      
+      seu_kang <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD8_T_cells/seu_kang.qs")
+      
+      seu_kang <- subset(seu_kang, subset = condition =="Healthy")
+      
+      
+      
+      seu_ramesh_5 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD8_T_cells/seu_ramesh.qs")
+      seu_ramesh_5 <- subset(seu_ramesh_5, subset = condition == "Healthy")
+      
+      
+      seu_cd55 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD8_T_cells/seu_cd55.qs")
+      seu_cd59 <-qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD8_T_cells/seu_cd59.qs")
+      
+      seu_cd55 <- subset(seu_cd55, subset = sample =="CD55-control")
+      
+      
+      seu_cd59 <- subset(seu_cd59, subset = sample =="CD59-control")
+      
+    }
+    
+    
+    
+  }
+  
+  
+  
+  healthy_list_for_integration <- list(
+    "seu_hong" = seu_hong,
+    "seu_kang" = seu_kang,
+    "seu_ramesh_5" = seu_ramesh_5,
+    "seu_cd55" = seu_cd55,
+    "seu_cd59" = seu_cd59)
+  
+  
+  
+  rm(seu_hong,seu_kang,seu_ramesh_5, seu_cd55, seu_cd59)
+  
+  
+  
+  gc()
+}
+
+
+
+```
+
+```{r, "output_list, meta_table and integrated_list of cd59",eval=FALSE}
+
+meta_table <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/meta_tables/neuroimmunological-healthy/CD59.Def_Mevorach_CD59_Patient_meta_table.qs")
+  
+
+
+
+```
+
+#THE whole autmated pipeline for most of the data:
+
+```{r, "getting outputlists for each of the neuro immunulogical conditions.",eval=FALSE}
+
+options(future.globals.maxSize = 1600 * 1024 * 1024 * 1024)  # 160 GB
+
+for (current_seu_patient in patient_list)
+{
+  seu_patient <- current_seu_patient$seu
+    output_list <- list()
+
+  
+  for (seu in healthy_list) {
+    
+    seu_control <- seu$seu
+  
+  # Run one-on-one function and get output
+  output <- one_on_one(seu_patient, seu_control, patient_type=current_seu_patient$condition, control_type="Healthy", patient_orig_ident=current_seu_patient$dataset)
+  
+  
+# browser()
+ 
+  # Extract orig.ident value
+  orig_ident_value <- as.character(unique(seu$seu$orig.ident)[1])
+
+  # Check if the orig.ident value already exists in output_list
+  if (length(output_list) > 0 && orig_ident_value %in% names(output_list)) {
+  # list is non-empty and that name already exists → append
+  output_list[[orig_ident_value]] <- 
+    append(output_list[[orig_ident_value]],
+           output[[orig_ident_value]])
+  } else {
+  # either the list is empty, or that name isn't there yet → create it
+  output_list[[orig_ident_value]] <- output[[orig_ident_value]]
+  }
+
+  }
+  
+output_dir <- paste0("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/output_lists/neuroimmunological-healthy/",current_seu_patient$condition,"_",current_seu_patient$dataset,"_",current_seu_patient$sample,"_outputlist.qs")
+
+                       
+qsave(output_list,output_dir)
+print(paste("just finished",output_dir))
+gc()
+    
+}
+
+
+```
+
+
+```{r, "meta table and integrated object",eval=FALSE}
+
+meta_table <- create_meta_table(output_list)
+
+qsave(meta_table, "/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/meta_tables/neuroimmunological-healthy/CD59.Def_Mevorach_CD59_Patient_meta_table.qs")
+
+seu_patient <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/seu_cd59_CD8_T_cells.qs")
+
+patient_condition <- "CD59.Def"
+
+mon_cd59_def_integrated <- get_integration(seu_patient, healthy_list_for_integration, patient_condition, cell_type_column = "is_CD8_T_cell")
+
+qsave(mon_cd59_def_integrated, "/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/integrated_objects/neuroimmunulogical-healthy/CD59.Def_Mevorach_CD59_Patient_integrated.qs")
+
+print(mon_cd59_def_integrated$integration_4_umap)
+
+```
+
+```{r, "comparison of meta vs int + turn genes into HUGO",eval=FALSE}
+
+#That's the code for all the samples, there is a function that does the same for just one sample: get_meta_int_comparison_pds_for_one_sample
+
+
+
+gsea_ora_all <- get_meta_int_comparison_pds_for_all_the_samples(integrated_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/integrated_objects/neuroimmunulogical-healthy/", meta_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/meta_tables/neuroimmunological-healthy/", files_to_exclude_int = NULL, files_to_exclude_meta =NULL,
+    cell_type = "CD8_T_cells") 
+
+```
+
+
+#Biological analysis:
+
+```{r, "All samples comparison of meta vs int ",eval=FALSE}
+
+save_dir_gsea <- "/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/full_gsea_ora_results/neuroimmunological-healthy/GSEA/"
+save_dir_ora <- "/bigdata/bgutman/Collabs/Dror mevorach/data/CD4_T_cells/full_gsea_ora_results/neuroimmunological-healthy/ORA/"
+
+
+
+
+try_pathways <- get_full_gsea_and_ora_dfs(gsea_ora_all$CD59.Def_Mevorach_CD59_Patient$gsea_list, gsea_ora_all$CD59.Def_Mevorach_CD59_Patient$ora_list,
+                                      save_dir_gsea, save_dir_ora)
+
+write.csv(try_pathways$meta_gsea_top, "/bigdata/bgutman/BackUp/CD59.Def_Mevorach_CD59_Patient_CD8_meta_gsea_top.csv", row.names = FALSE)
+
+write.csv(try_pathways$meta_ora_top, "/bigdata/bgutman/BackUp/CD59.Def_Mevorach_CD59_Patient_CD8_meta_ora_top.csv", row.names = FALSE)
+
+
+write.csv(meta_table, "/bigdata/bgutman/BackUp/CD59.Def_Mevorach_CD59_Patient_CD8_meta_table.csv", row.names = FALSE)
+
+
+
+```
+
+```{r, "getting full dfs with all the ORA and GSEA pathways ",eval=FALSE}
+
+gsea_ora_all <- get_meta_int_comparison_pds_for_all_the_samples(integrated_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/integrated_objects/neuroimmunulogical-healthy/", meta_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/meta_tables/neuroimmunological-healthy/", files_to_exclude_int = NULL, files_to_exclude_meta =NULL,
+                                                                cell_type = "Monocytes") 
+save_dir_gsea <- "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/full_gsea_ora_results/neuroimmunological-healthy/GSEA/"
+save_dir_ora <- "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/full_gsea_ora_results/neuroimmunological-healthy/ORA/"
+
+try_pathways <- get_full_gsea_and_ora_dfs(gsea_ora_all$CD59.Def_Mevorach_CD59_Patient$gsea_list, gsea_ora_all$CD59.Def_Mevorach_CD59_Patient$ora_list,
+                                          save_dir_gsea, save_dir_ora)
+
+
+
+```
+
+```{r, "lolipop plot of highlighted pathways ",eval=FALSE}
+
+CD8_T_full_gsea <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/full_gsea_ora_results/neuroimmunological-healthy/GSEA/full_meta_gsea_df.qs")
+
+list_of_highlight_pathways <-  c(
+  "HALLMARK_G2M_CHECKPOINT",
+  "HALLMARK_E2F_TARGETS",
+  "R-HSA-2500257",
+  "GO:0031577",
+  "GO:0005761",
+  "BIOCARTA_MCM_PATHWAY",
+  "hsa03030",
+  "BIOCARTA_P53_PATHWAY",
+  "HALLMARK_MTORC1_SIGNALING",
+  "hsa03050",
+  "HALLMARK_OXIDATIVE_PHOSPHORYLATION",
+  "HALLMARK_HYPOXIA",
+  "hsa04612",
+  "hsa04610",
+  "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
+  "GO:0042101"
+)
+
+# df <- try_pathways$meta_gsea_top
+
+manuall_changing_names <- list(
+  HALLMARK_E2F_TARGETS = "E2F Targets",
+  HALLMARK_TNFA_SIGNALING_VIA_NFKB = "TNFA Signaling via NFKB",
+  "HALLMARK_G2M_CHECKPOINT" = "G2M Checkpoint",
+  "DNA replication" = "DNA Replication",
+  "BIOCARTA_P53_PATHWAY" = " P53 Pathway",
+  "HALLMARK_OXIDATIVE_PHOSPHORYLATION" = "Oxidative Phosphorylation",
+  "HALLMARK_MITOTIC_SPINDLE" = "Mitotic Spindle",
+  "BIOCARTA_MCM_PATHWAY" = "MCM Pathway",
+  "HALLMARK_MTORC1_SIGNALING" ="mTORC1 Signaling",
+  "T cell receptor complex" = "T Cell Receptor Complex"
+)
+
+cell_type ="CD8_T_cells"
+condition = "CD59 def."
+sample_name = "CD59 patient"
+dataset_name = "Mevorach"
+
+
+try_lollipop <- get_pathway_lollipop(CD8_T_full_gsea,list_of_highlight_pathways,manuall_changing_names =manuall_changing_names, cell_type =cell_type, condition, sample_name = sample_name, dataset_name = dataset_name, lollipop_color = "#48CAE4")
+
+
+pdf("/bigdata/bgutman/Collabs/Dror mevorach/plots/CD8_T_cells/CD59.Def_CD8_T_cells_meta_gsea_highlight_lolipop.pdf", width = 26, height = 20)
+print(try_lollipop$p_pathway_lollipop)
+dev.off()
+
+ggsave(
+       filename = "/bigdata/bgutman/Collabs/Dror mevorach/plots/B_cells/CD59.Def_B_cells_meta_gsea_highlight_lolipop.jpg",
+       plot     = try_lollipop$p_pathway_lollipop,
+       width    = 26,      # inches – change to taste
+       height   = 20,
+       units    = "in",
+       dpi      = 600,     # dots per inch
+       device   = ragg::agg_jpeg,  # requires `ragg`; gives better anti-aliasing than base R
+       quality  = 1) # JPEG quality (1 = 100 %)
+
+
+```
+
+
+# Plots:
+
+```{r, "get_CD4_cells benchmark: confusion_matrix_and_idenfication_4_umaps", eval=FALSE}
+
+
+
+seu_hao_3 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/cite-seq_benchmark/seu_hao_3p.qs")
+seu_hao_5 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/cite-seq_benchmark/seu_hao_5p.qs")
+
+metric_column <- "is_CD8_T_cell"
+ground_truth_label <- "CD8 T"
+metric_label <- "CD8+ T cells"
+ucell_column <-  "cd_8_signature_by_ucell"
+
+plan(multisession, workers = 8)         # or multicore on Linux console
+options(future.globals.maxSize = 100 * 1024^3) # 100 GiB
+
+
+
+#get_monocytes for seu_hao_3 and seu_hao_5
+{
+  # seu_hao_3 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/cite-seq_benchmark/seu_hao_3p.qs")
+  seu_hao_3 <- get_CD8_cells(seu_hao_3)
+  
+  # seu_hao_5 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/cite-seq_benchmark/seu_hao_5p.qs")
+  seu_hao_5 <- get_CD8_cells(seu_hao_5)
+  
+
+  
+}
+
+#get plots
+{
+  
+  #hao_3
+  {
+    hao_3_confusion_matrix_and_idenfication_umap<- get_confusion_matrix_and_idenfication_4_umaps(seu_hao_3,metric_column, metric_label, ground_truth_column = "celltype.l1", ground_truth_label, ucell_column = ucell_column)
+    
+    p_seu_hao_3_ground_truth <- dittoDimPlot(seu_hao_3, "celltype.l1", reduction.use = "wnn.umap", size = 0.4) +
+      ggplot2::ggtitle(label = "<b>Ground Truth</b> lables for seu_hao_3" ) +
+      theme(plot.title = element_markdown())
+    
+    
+  }
+  
+  #hao_5
+  {
+    hao_5_confusion_matrix_and_idenfication_umap<- get_confusion_matrix_and_idenfication_4_umaps(seu_hao_5,metric_column, metric_label, ground_truth_column = "celltype.l1", ground_truth_label, ucell_column = ucell_column)
+    
+    
+    p_seu_hao_5_ground_truth <- dittoDimPlot(seu_hao_5, "celltype.l1", reduction.use = "wnn.umap", size = 0.4) +
+      ggplot2::ggtitle(label = "<b>Ground Truth</b> lables for seu_hao_5" ) +
+      theme(plot.title = element_markdown())
+    
+    
+    
+  }
+}
+
+#save as pdfs
+{
+  #hao 3
+  {
+    pdf("/bigdata/bgutman/Collabs/Dror mevorach/scripts/tryp_hao3.pdf", width = 26, height = 20)
+    print(hao_3_confusion_matrix_and_idenfication_umap$p_cell_type_idenfication)
+    print(p_seu_hao_3_ground_truth )
+    dev.off()
+    
+  }
+  
+  
+  #hao 5
+  
+  {
+    pdf("/bigdata/bgutman/Collabs/Dror mevorach/scripts/tryp_hao5.pdf", width = 26, height = 20)
+    print(hao_5_confusion_matrix_and_idenfication_umap$p_cell_type_idenfication)
+    print(p_seu_hao_5_ground_truth )
+    dev.off()
+  }
+}
+
+
+
+
+
+
+```
+
+
+# Create Data:
+
+```{r, "Load healthy_list: list of 12 healthy controls + Create seu_cd59_CD4_T_cells.qs", eval=FALSE}
+
+
+#Subset to healthy controls only
+{
+  #Hong
+  seu_hong <- qread("/bigdata/barakgutman/neuroimmunulogical_project/scRNA-seq/scRNA_PBMCs/data/pSS/Hong/seu_hong.qs")
+  
+  seu_hong <- subset(seu_hong, subset = sample  %in% c("HC-1", "HC-2",
+                                                       "HC-3",
+                                                       "HC-4",
+                                                       "HC-5"))
+  
+  #Kang
+  seu_kang <- qread("/bigdata/barakgutman/neuroimmunulogical_project/scRNA-seq/scRNA_PBMCs/data/MS_and_other_disorders/Kang/seu_kang.qs")
+  
+  seu_kang <- subset(seu_kang, subset = sample  %in% c("JSB",
+                                                       "KYO"))
+  
+  
+  #Ramesh
+  seu_ramesh <- qread("/bigdata/barakgutman/neuroimmunulogical_project/scRNA-seq/scRNA_PBMCs/data/MS_and_other_disorders/Ramesh/seu_ramesh_5.qs")
+  
+  seu_ramesh <- subset(seu_ramesh, subset = sample  %in% c("2",
+                                                           "3", "32"))
+  
+  #Mevorach
+  seu_cd59 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd59.qs")
+  
+  seu_cd59 <- subset(seu_cd59, subset = condition  == "Healthy")
+  
+  seu_cd59$sample <-"CD59-control"
+  
+  
+  seu_cd55 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd55.qs")
+  
+  seu_cd55 <- subset(seu_cd55, subset = condition  == "Healthy")
+  
+  seu_cd55$sample <-"CD55-control"
+  
+  
+  healthy_list <- list(seu_cd55 = seu_cd55,
+                       seu_cd59 = seu_cd59,
+                       seu_hong = seu_hong,
+                       seu_kang = seu_kang,
+                       seu_ramesh = seu_ramesh)
+  
+  rm(seu_cd55, seu_cd59, seu_hong, seu_kang, seu_ramesh)  
+  
+  
+  
+}
+
+# get_CD8_cells and get_full_seurat
+{
+  plan(multisession, workers = 8)         # or multicore on Linux console
+  options(future.globals.maxSize = 100 * 1024^3) # 100 GiB
+
+  healthy_list <- lapply(healthy_list, get_CD4_cells)
+  healthy_list <- lapply(healthy_list, get_CD8_cells)
+  healthy_list <- lapply(healthy_list, function(seu) {
+    subset(seu, subset = is_CD8_T_cell == "CD8+ T cells")
+  })
+  healthy_list <- lapply(healthy_list, get_full_seurat)
+  
+  
+  
+}
+
+#PDF as a sanity check
+{
+  
+  pdf("/bigdata/bgutman/Collabs/Dror mevorach/scripts/tryp.pdf", width = 26, height = 20)
+  
+  # loop over the *names* in healthy_list so we can use the name in the title
+  for (nm in names(healthy_list)) {
+    seu_obj <- healthy_list[[nm]]
+    
+    p <- dittoDimPlot(
+      seu_obj,
+      "is_CD4_T_cell",
+      reduction.use = "umap",
+      size         = 0.4
+    ) +
+      ggplot2::ggtitle(paste("UMAP for", nm))
+    
+    print(p)
+  }
+  
+  dev.off()
+}
+
+#Saving loop
+{
+  for (nm in names(healthy_list)) {
+    
+    seu_obj <- healthy_list[[nm]]
+    
+    save_dir <- paste0("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/healthy_CD4_T_cells/",nm,".qs")
+    
+    qsave(seu_obj,save_dir)
+  }
+  
+}
+
+#Create seu_cd59_CD8_T_cells
+{
+  seu_cd59 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/seu_cd59.qs")
+
+seu_cd59 <- subset(seu_cd59, subset = condition  == "CD59.Def")
+
+
+seu_cd59 <- get_CD4_cells(seu_cd59)
+seu_cd59 <- get_CD8_cells(seu_cd59)
+seu_cd59 <- subset(seu_cd59, subset = is_CD8_T_cell == "CD8+ T cells")
+seu_cd59 <- get_full_seurat(seu_cd59)
+
+qsave(seu_cd59,"/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/seu_cd59_CD8_T_cells.qs")}
+
+
+
+```
+
+
+
+
