@@ -13,9 +13,9 @@ options(bitmapType = "cairo")
 
 
 ```
-
+# 1. Environment Setup & Data Loading
+## 1.1 Libraries, Custom Signatures, and Helper Functions
 ```{r, "libraries and signatures", echo=FALSE}
-
 
 
 suppressPackageStartupMessages({
@@ -149,7 +149,7 @@ source("/bigdata/bgutman/Collabs/Dror mevorach/scripts/functions.R")
 ```
 
 
-#Load data:
+## 1.2 Loading Pre-Processed CD4+ T-Cell Cohorts & Integrated Reference:
 ```{r, "Load healthy_list: list of 12 healthy controls", eval=FALSE}
 
 # #Loading seurat objects that include healthy samples
@@ -345,7 +345,8 @@ options(future.globals.maxSize = 1600 * 1024 * 1024 * 1024)  # 160 GB
 ```
 
 
-#THE whole autmated pipeline for most of the data:
+# 2. Comparative Single-Cell & Meta-Analysis Pipeline
+## 2.1 Pairwise Differential Expression (one_on_one)
 
 ```{r, "getting outputlists for each of the neuro immunulogical conditions.",eval=FALSE}
 
@@ -394,7 +395,7 @@ gc()
 
 
 ```
-
+## 2.2 Meta-Analysis Table Construction (create_meta_table)
 ```{r, "meta table and integrated object",eval=FALSE}
 
 meta_table <- create_meta_table(output_list)
@@ -410,7 +411,7 @@ mon_cd59_def_integrated <- get_integration(seu_patient, healthy_list_for_integra
 qsave(mon_cd59_def_integrated, "/bigdata/bgutman/Collabs/Dror mevorach/data/CD4_T_cells/integrated_objects/ neuroimmunulogical-healthy/ CD59.Def_Mevorach_CD59_Patient_integrated.qs")
 
 ```
-
+## 2.3 Multi-Cohort Harmony Integration
 ```{r, "comparison of meta vs int + turn genes into HUGO",eval=FALSE}
 
 #That's the code for all the samples, there is a function that does the same for just one sample: get_meta_int_comparison_pds_for_one_sample
@@ -422,8 +423,10 @@ gsea_ora_all <- get_meta_int_comparison_pds_for_all_the_samples(integrated_path 
 
 ```
 
-#Biological analysis:
+# 3. Pathway Enrichment & Biological Interpretation
 
+
+## 3.1 Over-Representation Analysis (ORA) & GSEA Across Cohorts
 ```{r, "All samples comparison of meta vs int ",eval=FALSE}
 
 save_dir_gsea <- "/bigdata/bgutman/Collabs/Dror mevorach/data/CD4_T_cells/full_gsea_ora_results/neuroimmunological-healthy/GSEA/"
@@ -460,7 +463,7 @@ try_pathways <- get_full_gsea_and_ora_dfs(gsea_ora_all$CD59.Def_Mevorach_CD59_Pa
 
 
 ```
-
+## 3.2 Key Enriched Pathways (Lollipop Analysis)
 ```{r, "lolipop plot of highlighted pathways ",eval=FALSE}
 
 CD4_T_full_gsea <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD4_T_cells/full_gsea_ora_results/neuroimmunological-healthy/GSEA/full_meta_gsea_df.qs")
@@ -521,7 +524,7 @@ ggsave(
 
 
 ```
-
+## 3.3 Multi-Pathway Gene Intersection Analysis
 ```{r, "Finding overlap genes ",eval=FALSE}
 
 
@@ -594,8 +597,10 @@ integrated_list <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD4_T_cell
 ```
 
 
-# Plots:
+# 4. Publication Figures & Benchmarking
 
+
+## 4.1 CITE-seq Benchmark Validation (Hao PBMC Cohort)
 
 ```{r, "get_CD4_cells benchmark: confusion_matrix_and_idenfication_4_umaps", eval=FALSE}
 
@@ -683,7 +688,7 @@ options(future.globals.maxSize = 100 * 1024^3) # 100 GiB
 
 
 ```
-
+## 4.2 Forest Plots: Key Pathway Overlap Genes
 ```{r, "4 forset plots: Key genes overlapping pathways", eval=FALSE}
 output_list <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD4_T_cells/output_lists/neuroimmunological-healthy/CD59.Def_Mevorach_CD59_Patient_outputlist.qs")
 four_genes_vector <- c("MCM2","ORC6","JUNB","TNFAIP3")
@@ -705,7 +710,7 @@ ggsave(
        quality  = 1) # JPEG quality (1 = 100 %)
 
 ```
-
+## 4.3 Forest Plots: Top/Bottom Phenotype Validation Genes
 ```{r, "4 forset plots: Top/bottom genes validating Phenotype", eval=FALSE}
 
 output_list <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/B_cells/output_lists/neuroimmunological-healthy/CD59.Def_Mevorach_CD59_Patient_outputlist.qs")
@@ -729,8 +734,10 @@ ggsave(
 
 ```
 
-# Create Data:
+# 5. Appendix: Reference Cohort Preparation (ETL)
 
+
+## 5.1 Healthy Control Ingestion & CD4+ T-Cell Isolation
 ```{r, "Load healthy_list: list of 12 healthy controls + Create seu_cd59_CD4_T_cells.qs", eval=FALSE}
 
 
