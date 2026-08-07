@@ -13,7 +13,8 @@ options(bitmapType = "cairo")
 
 
 ```
-
+# 1. Environment Setup & Data Loading
+## 1.1 Libraries, Custom Signatures, and Helper Functions
 ```{r, "libraries and signatures", echo=FALSE}
 
 
@@ -147,8 +148,7 @@ source("/bigdata/bgutman/Collabs/Dror mevorach/scripts/functions.R")
     
 ```
 
-#Load data:
-```{r, "Load healthy_list: list of 12 healthy controls", eval=FALSE}
+## 1.2 Loading Pre-Processed CD8+ T-Cell Cohorts & Integrated Reference```{r, "Load healthy_list: list of 12 healthy controls", eval=FALSE}
 
 # #Loading seurat objects that include healthy samples
 # relevant_datasets <- nk_prcnt %>%     filter(disease =="Healthy") %>% pull(dataset)
@@ -342,8 +342,8 @@ meta_table <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/met
 
 ```
 
-#THE whole autmated pipeline for most of the data:
-
+# 2. Comparative Single-Cell & Meta-Analysis Pipeline
+## 2.1 Pairwise Differential Expression (one_on_one)
 ```{r, "getting outputlists for each of the neuro immunulogical conditions.",eval=FALSE}
 
 options(future.globals.maxSize = 1600 * 1024 * 1024 * 1024)  # 160 GB
@@ -392,7 +392,7 @@ gc()
 
 ```
 
-
+## 2.2 Meta-Analysis Table Construction (create_meta_table)
 ```{r, "meta table and integrated object",eval=FALSE}
 
 meta_table <- create_meta_table(output_list)
@@ -410,7 +410,7 @@ qsave(mon_cd59_def_integrated, "/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_
 print(mon_cd59_def_integrated$integration_4_umap)
 
 ```
-
+## 2.3 Multi-Cohort Harmony Integration
 ```{r, "comparison of meta vs int + turn genes into HUGO",eval=FALSE}
 
 #That's the code for all the samples, there is a function that does the same for just one sample: get_meta_int_comparison_pds_for_one_sample
@@ -423,8 +423,10 @@ gsea_ora_all <- get_meta_int_comparison_pds_for_all_the_samples(integrated_path 
 ```
 
 
-#Biological analysis:
+# 3. Pathway Enrichment & Biological Interpretation
 
+
+## 3.1 Over-Representation Analysis (ORA) & GSEA Across Cohorts
 ```{r, "All samples comparison of meta vs int ",eval=FALSE}
 
 save_dir_gsea <- "/bigdata/bgutman/Collabs/Dror mevorach/data/CD8_T_cells/full_gsea_ora_results/neuroimmunological-healthy/GSEA/"
@@ -446,7 +448,7 @@ write.csv(meta_table, "/bigdata/bgutman/BackUp/CD59.Def_Mevorach_CD59_Patient_CD
 
 
 ```
-
+## 3.2 Key Enriched Pathways (Lollipop Analysis)
 ```{r, "getting full dfs with all the ORA and GSEA pathways ",eval=FALSE}
 
 gsea_ora_all <- get_meta_int_comparison_pds_for_all_the_samples(integrated_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/integrated_objects/neuroimmunulogical-healthy/", meta_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/meta_tables/neuroimmunological-healthy/", files_to_exclude_int = NULL, files_to_exclude_meta =NULL,
@@ -526,8 +528,8 @@ ggsave(
 ```
 
 
-# Plots:
-
+# 4. Publication Figures & Benchmarking
+## 4.1 CITE-seq Benchmark Validation (Hao PBMC Cohort)
 ```{r, "get_CD4_cells benchmark: confusion_matrix_and_idenfication_4_umaps", eval=FALSE}
 
 
@@ -615,7 +617,8 @@ options(future.globals.maxSize = 100 * 1024^3) # 100 GiB
 ```
 
 
-# Create Data:
+# 5. Appendix: Reference Cohort Preparation (ETL)
+## 5.1 Healthy Control Ingestion & CD8+ T-Cell Isolation
 
 ```{r, "Load healthy_list: list of 12 healthy controls + Create seu_cd59_CD4_T_cells.qs", eval=FALSE}
 
