@@ -14,6 +14,10 @@ options(bitmapType = "cairo")
 
 ```
 
+
+# 1. Environment Setup & Data Loading
+## 1.1 Libraries, Custom Signatures, and Helper Functions
+
 ```{r, "libraries and signatures", echo=FALSE}
 
 
@@ -104,7 +108,7 @@ signatures <- list(
   
   follicular_helper_t_cells = c("CXCR5", "PDCD1", "BCL6", "ICOS", "SH2D1A", "CD40LG", "IL21", "IL10", "B3GAT1"),
   regulatory_tcell = c("IL2RA", "FOXP3", "IL7R", "ICOS", "TNFRSF18", "CTLA4", "TIGIT", "ENTPD1", "TNFRSF9", "TNFRSF1B"),
-  th1 = c("TBX21", "STAT4", "IFNG", "IL12RB1", "IL12RB2", "CXCR3", "CCR5", "CD44", "Fas", "	IFNGR1", "HAVCR2"),
+  th1 = c("TBX21", "STAT4", "IFNG", "IL12RB1", "IL12RB2", "CXCR3", "CCR5", "CD44", "Fas", "\tIFNGR1", "HAVCR2"),
   th17 = c("IL17A", "IL17F", "IL21", "IL22", "KLRB1", "CCR4", "CCR6", "APOD", "C1QL1", "CTSL"),
   th2 = c("GATA3", "STAT6", "IL4", "IL5", "IL13", "CCR4", "CCR8"),
   naive_cd4_t_cells=c("LCK", "ZAP70", "KLF2", "CD3G", "CD3D", "CD3GE", "CD28", "SELL", "PTPRC", "CD5", "CCR7", "CD27", "IL7R"),
@@ -113,7 +117,7 @@ signatures <- list(
 
   naive_cd8_t_cells = c("CD27", "CD28", "PTPRC", "SELL", "CCR7", "IL7R", "CD5", "CD8A", "CD8B", "CXCR3"),
   central_memory_cd8_t_cells = c("SELL", "CCR7", "IL7R", "CD27", "EOMES", "HNF1A", "BCL6", "ID3", "STAT3"),
-  effector_memory_cd8_t_cells = c("SELL", "CCR7", "KLRG1", "	GZMB", "TBX21", "Blimp1", "ID2", "STAT4", "ITGAE", "ITGA1", "CXCR3"),
+  effector_memory_cd8_t_cells = c("SELL", "CCR7", "KLRG1", "\tGZMB", "TBX21", "Blimp1", "ID2", "STAT4", "ITGAE", "ITGA1", "CXCR3"),
   terminal_effector_cd8_t_cells = c("KLRG1", "IL7R", "B3GAT1", "CXCR3", "CD27", "CD28", "IFNG", "IL2", "CDKN1B")
 )
 
@@ -147,7 +151,7 @@ source("/bigdata/bgutman/Collabs/Dror mevorach/scripts/functions.R")
     
 ```
 
-#Load data:
+## 1.2 Loading Pre-Processed B-Cell Cohorts & Integrated Reference
 ```{r, "Load healthy_list: list of 12 healthy controls", eval=FALSE}
 
 # #Loading seurat objects that include healthy samples
@@ -192,7 +196,6 @@ seu_cd59 <- subset(seu_cd59, subset = sample =="CD59-control")
 
 
 
-
 #List of all the Seurat objects
 
 healthy_list <- list(
@@ -215,7 +218,6 @@ healthy_list <- list(
 
 )   
   
-
 
 
 
@@ -322,6 +324,7 @@ options(future.globals.maxSize = 1600 * 1024 * 1024 * 1024)  # 160 GB
   
   
   
+  
   rm(seu_hong,seu_kang,seu_ramesh_5, seu_cd55, seu_cd59)
   
   
@@ -346,7 +349,8 @@ meta_table <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/meta_
 ```
 
 
-#THE whole autmated pipeline for most of the data:
+# 2. Comparative Single-Cell & Meta-Analysis Pipeline
+## 2.1 Pairwise Differential Expression (one_on_one)
 
 ```{r, "getting outputlists for each of the neuro immunulogical conditions.",eval=FALSE}
 
@@ -384,9 +388,9 @@ for (current_seu_patient in patient_list)
 
   }
   
-output_dir <- paste0("/bigdata/bgutman/Collabs/Dror mevorach/data/B_cells/output_lists/neuroimmunological-healthy/",current_seu_patient$condition,"_",current_seu_patient$dataset,"_",current_seu_patient$sample,"_outputlist.qs")
+output_dir <- paste0("/bigdata/bgutman/Collabs/Dror mevorach/data/B_cells/output_lists/neuroimmunological-healthy/",current_seu_patient$condition,"_",current_seu_patient$dataset,"_",current_seu_p[...]
 
-                       
+                        
 qsave(output_list,output_dir)
 print(paste("just finished",output_dir))
 gc()
@@ -396,6 +400,7 @@ gc()
 
 ```
 
+## 2.2 Meta-Analysis Table Construction (create_meta_table)
 ```{r, "meta table and integrated object",eval=FALSE}
 
 meta_table <- create_meta_table(output_list)
@@ -408,21 +413,21 @@ mon_cd59_def_integrated <- get_integration(seu_patient, healthy_list_for_integra
 
 ```
 
-
+## 2.3 Multi-Cohort Harmony Integration
 ```{r, "comparison of meta vs int + turn genes into HUGO",eval=FALSE}
 
 #That's the code for all the samples, there is a function that does the same for just one sample: get_meta_int_comparison_pds_for_one_sample
 
 
 
-gsea_ora_all <- get_meta_int_comparison_pds_for_all_the_samples(integrated_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/B_cells/integrated_objects /neuroimmunulogical-healthy/", meta_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/B_cells/meta_tables/neuroimmunological-healthy/", files_to_exclude_int = NULL, files_to_exclude_meta =NULL,
+gsea_ora_all <- get_meta_int_comparison_pds_for_all_the_samples(integrated_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/B_cells/integrated_objects /neuroimmunulogical-healthy/", meta_path [...]
     cell_type = "B_cells") 
 
 ```
 
 
-
-#Biological analysis:
+# 3. Pathway Enrichment & Biological Interpretation
+## 3.1 Over-Representation Analysis (ORA) & GSEA Across Cohorts
 
 ```{r, "All samples comparison of meta vs int ",eval=FALSE}
 
@@ -449,7 +454,7 @@ write.csv(meta_table, "/bigdata/bgutman/BackUp/CD59.Def_Mevorach_CD59_Patient_B_
 
 ```{r, "getting full dfs with all the ORA and GSEA pathways ",eval=FALSE}
 
-gsea_ora_all <- get_meta_int_comparison_pds_for_all_the_samples(integrated_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/integrated_objects/neuroimmunulogical-healthy/", meta_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/meta_tables/neuroimmunological-healthy/", files_to_exclude_int = NULL, files_to_exclude_meta =NULL,
+gsea_ora_all <- get_meta_int_comparison_pds_for_all_the_samples(integrated_path = "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/integrated_objects/neuroimmunulogical-healthy/", meta_path[...]
                                                                 cell_type = "Monocytes") 
 save_dir_gsea <- "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/full_gsea_ora_results/neuroimmunological-healthy/GSEA/"
 save_dir_ora <- "/bigdata/bgutman/Collabs/Dror mevorach/data/Monocytes/full_gsea_ora_results/neuroimmunological-healthy/ORA/"
@@ -461,6 +466,7 @@ try_pathways <- get_full_gsea_and_ora_dfs(gsea_ora_all$CD59.Def_Mevorach_CD59_Pa
 
 ```
 
+## 3.2 Key Enriched Pathways (Lollipop Analysis)
 ```{r, "lolipop plot of highlighted pathways ",eval=FALSE}
 
 B_cells_full_gsea <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/B_cells/full_gsea_ora_results/neuroimmunological-healthy/GSEA/full_meta_gsea_df.qs")
@@ -507,7 +513,7 @@ sample_name = "CD59 patient"
 dataset_name = "Mevorach"
 
 
-try_lollipop <- get_pathway_lollipop(B_cells_full_gsea,list_of_highlight_pathways,manuall_changing_names =manuall_changing_names, cell_type =cell_type, condition, sample_name = sample_name, dataset_name = dataset_name, lollipop_color = "#fb8500")
+try_lollipop <- get_pathway_lollipop(B_cells_full_gsea,list_of_highlight_pathways,manuall_changing_names =manuall_changing_names, cell_type =cell_type, condition, sample_name = sample_name, datas[...]
 
 
 pdf("/bigdata/bgutman/Collabs/Dror mevorach/plots/B_cells/CD59.Def_B_cells_meta_gsea_highlight_lolipop.pdf", width = 26, height = 20)
@@ -527,6 +533,7 @@ ggsave(
 
 ```
 
+## 3.3 Multi-Pathway Gene Intersection Analysis
 ```{r, "Finding overlap genes ",eval=FALSE}
 
 
@@ -621,8 +628,8 @@ overlap_genes <-  get_overlap_genes_between_pathways(
 ```
 
 
-# Plots:
-
+# 4. Publication Figures & Benchmarking
+## 4.1 CITE-seq Benchmark Validation (Hao PBMC Cohort)
 
 ```{r, "get_monocytes benchmark: confusion_matrix_and_idenfication_4_umaps", eval=FALSE}
 
@@ -638,6 +645,7 @@ options(future.globals.maxSize = 100 * 1024^3) # 100 GiB
 
 
 
+
 #get_monocytes for seu_hao_3 and seu_hao_5
 {
   seu_hao_3 <- get_B_cells(seu_hao_3)
@@ -649,7 +657,7 @@ options(future.globals.maxSize = 100 * 1024^3) # 100 GiB
 {
   #hao_3
   {
-    hao_3_confusion_matrix_and_idenfication_umap<- get_confusion_matrix_and_idenfication_4_umaps(seu_hao_3,metric_column, metric_label, ground_truth_column = "celltype.l1", ground_truth_label, ucell_column = "monocyte_by_ucell")
+    hao_3_confusion_matrix_and_idenfication_umap<- get_confusion_matrix_and_idenfication_4_umaps(seu_hao_3,metric_column, metric_label, ground_truth_column = "celltype.l1", ground_truth_label, uc[...]
 
     p_seu_hao_3_ground_truth <- dittoDimPlot(seu_hao_3, "celltype.l1", reduction.use = "wnn.umap", size = 0.4) +
       ggplot2::ggtitle(label = "<b>Ground Truth</b> lables for seu_hao_3" ) +
@@ -700,6 +708,7 @@ options(future.globals.maxSize = 100 * 1024^3) # 100 GiB
 ```
 
 
+## 4.2 Forest Plots: Key Pathway Overlap Genes
 ```{r, "4 forset plots: Key genes overlapping pathways", eval=FALSE}
 output_list <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/B_cells/output_lists/neuroimmunological-healthy/CD59.Def_Mevorach_CD59_Patient_outputlist.qs")
 four_genes_vector <- c("NDUFV2","NFKBIA","CD69","CCR6")
@@ -722,6 +731,7 @@ ggsave(
 
 ```
 
+## 4.3 Forest Plots: Top/Bottom Phenotype Validation Genes
 ```{r, "4 forset plots: Top/bottom genes validating Phenotype", eval=FALSE}
 
 output_list <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/B_cells/output_lists/neuroimmunological-healthy/CD59.Def_Mevorach_CD59_Patient_outputlist.qs")
@@ -745,8 +755,8 @@ ggsave(
 
 ```
 
-# Create Data:
-
+# 5. Appendix: Reference Cohort Preparation (ETL)
+## 5.1 Healthy Control Ingestion & B-Cell Isolation
 ```{r, "Load healthy_list: list of 12 healthy controls", eval=FALSE}
 
 #Subset to healthy controls only
@@ -855,7 +865,3 @@ dev.off()
 
 
 ```
-
-
-
-
