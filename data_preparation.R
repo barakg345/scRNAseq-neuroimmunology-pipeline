@@ -1,4 +1,10 @@
+**Overview:** This script documents the granular, exploratory development and step-by-step testing of the pairwise differential expression (PDE) pipeline. 
+#Subsequent analyses for other cell types utilize the fully automated, streamlined pipeline derived from this foundational workflow.
+
+# 1. Environment Setup & Custom Signatures
+## 1.1 Package Loading & Cell-Type Signature Definitions
 #Libraries and Signatures
+
 {
   
   
@@ -85,6 +91,10 @@
   
 }
 
+
+# 2. Custom Single-Cell Analysis & Plotting Functions
+
+# 2.1 Downstream Analysis Utilities
 
 #Functions for analysis
 {
@@ -758,7 +768,9 @@
 }
 
 
+# 2.2 Data Extraction & Matrix Merging Utilities
 #Functions for extraction
+
 {
   # Download function with quite mode and 3 attempts to download each file (it assumes network problems etc)
   download_file <- function(url, output_file) {
@@ -950,31 +962,54 @@
   
 }
 
+# 3. Pre-Processed Healthy Cohort Databases (Fast Pass)
+# 3.1 Loading Compiled Datasets
 #Fast Pass to all the databases
+
 {
-  #Yang
+# 4. Reference Data Ingestion & Processing (ETL)
+
+# 4.1 Yang Cohort
+
+#Yang
   seu_yang <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_yang.qs")
   
-  #Witkowski
+# 4.2 Witkowski Cohort
+
+#Witkowski
+  
   seu_witkowski_h6 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_witkowski_h6.qs")
   seu_witkowski_h8 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_witkowski_h8.qs")
   seu_witkowski_h21_h18_h2 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_witkowski_h_2_18_21.qs")
   
-  #Smith
+# 4.3 Smith Cohort
+
+#Smith
+  
   seu_smith_NRHV193_NRHV187 <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_smith_NRHV193_NRHV187.qs")
   seu_smith_em <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_smith_em.qs")
   
-  #Degagne
+# 4.4 Degagne Cohort
+  
+#Degagne
   seu_degagne <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_degagne.qs")
   
-  #Zhang
+# 4.5 Zhang Cohort
+
+#Zhang
   seu_zhang <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_zhang.qs")
   
-  #Gou
+# 4.6 Gou Cohort
+
+#Gou
   seu_gou <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_gou.qs")
   
 }
 
+# 4. Reference Data Ingestion & Processing (ETL)
+
+
+# 4.1 Yang Cohort
 #Yang
 
 {
@@ -1048,6 +1083,7 @@
   }
 }
 
+# 4.2 Witkowski Cohort
 
 #Witkowski
 {
@@ -1334,7 +1370,7 @@
   
 }
 
-
+# 4.3 Smith Cohort
 #Smith
 {
   #EM_HD1_NK_scRNAseq
@@ -1475,6 +1511,8 @@
   }
 }
 
+# 4.4 Degagne Cohort
+
 #Degagne
 {
   download_file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM7933938&format=file&file=GSM7933938%5FscCB000165%5Fbarcodes%2Etsv%2Egz",
@@ -1552,6 +1590,7 @@
   }  
 }
 
+# 4.5 Zhang Cohort
 
 #Zhang
 {
@@ -1624,6 +1663,8 @@
     
   }  
 }
+
+# 4.6 Gou Cohort
 
 #Gou
 {
@@ -1741,6 +1782,8 @@
       qsave(seu_kang,"/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_gou.qs")  
     }
   }
+                         
+# 4.7 Lym Cohort
 
   #Lym
   {
@@ -1912,223 +1955,8 @@ p_condition <- dittoDimPlot(seu, "condition", reduction.use = "umap", size = siz
 p_final <- ((p_clusters + p_condition) / (p_singler + p_sample))
 print(p_final)
 
-#IRRELEVANT
-{
-  #Rebuffet / Crenier (same data, two different papers) - Brain dead patients (we want live and healthy ones)
-  {
-    
-    # download_file("  https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3377676&format=file&file=GSM3377676%5Fsample4h%2Ecsv%2Egz",
-    #               "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Rebuffet/GSM3377676_sample4h.csv.gz")
-    # 
-    # 
-    # download_file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3377677&format=file&file=GSM3377677%5Fsample5h%2Ecsv%2Egz",
-    #               "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Rebuffet/GSM3377677_sample5h.csv.gz")
-    # 
-    # download_file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM3377678&format=file&file=GSM3377678%5Fsample6h%2Ecsv%2Egz",
-    #               "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Rebuffet/GSM3377678_sample6h.csv.gz")
-    # 
-    # # Unzip the files
-    # 
-    # 
-    # library(R.utils)
-    # 
-    # gunzip("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Rebuffet/GSM3377676_sample4h.csv.gz",
-    #        remove = FALSE)
-    # 
-    # gunzip("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Rebuffet/GSM3377677_sample5h.csv.gz",
-    #        remove = FALSE)
-    # 
-    # gunzip("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Rebuffet/GSM3377678_sample6h.csv.gz",
-    #        remove = FALSE)
-    # 
-    # # Read the CSV file and suppress the message
-    # try <- read_csv("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Rebuffet/GSM3377678_sample6h.csv", show_col_types = FALSE)
-    # 
-    # # Step 1: Set the first column (...1) as row names (gene names)
-    # rownames(try) <- try$...1
-    # try <- try[ , -1]  # Remove the first column after setting it as row names
-    # 
-    # # Step 2: Create a Seurat object directly from the data frame
-    # seurat_obj <- CreateSeuratObject(counts = try, project = "NK_cells", min.cells = 3, min.features = 200)
-    # 
-    # # View the Seurat object
-    # head(seurat_obj)
-    # # 
-    # 
-    
-  }
-  
-  
-  #Hu - isolated the NKS computationally
-  {
-    #Download
-    {
-      download_file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM7510825&format=file&file=GSM7510825%5FH2%5Fexpression%5Fcounts%2Ecsv%2Egz",
-                    "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/GSM7510825_H2_expression_counts.csv.gz")
-      
-      
-      download_file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM7510826&format=file&file=GSM7510826%5FH3%5Fexpression%5Fcounts%2Ecsv%2Egz",
-                    "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/GSM7510826_H3_expression_counts.csv.gz")
-      
-      
-      download_file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM7510827&format=file&file=GSM7510827%5FH4%5Fexpression%5Fcounts%2Ecsv%2Egz",
-                    "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/GSM7510827_H4_expression_counts.csv.gz")
-      
-      download_file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM7510828&format=file&file=GSM7510828%5FH5%5Fexpression%5Fcounts%2Ecsv%2Egz",
-                    "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/GSM7510828_H5_expression_counts.csv.gz")
-      
-      
-      
-      download_file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM7510829&format=file&file=GSM7510829%5FH6%5Fexpression%5Fcounts%2Ecsv%2Egz",
-                    "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/GSM7510829_H6_expression_counts.csv.gz")
-      
-      download_file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM7510830&format=file&file=GSM7510830%5FH7%5Fexpression%5Fcounts%2Ecsv%2Egz",
-                    "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/GSM7510830_H7_expression_counts.csv.gz")
-      
-    }
-    
-    #gunzip
-    {
-      
-      # Set the buffer size (if needed for large files)
-      Sys.setenv("VROOM_CONNECTION_SIZE" = 131072 * 2)
-      
-      # List all the files in the folder
-      gz_files <- list.files(path = "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/", 
-                             pattern = "\\.gz$", full.names = TRUE)
-      
-      
-      
-      # Loop through each .gz file, decompress, read, and save with the sample name
-      for (file in gz_files) {
-        print(paste("Decompressing:", file))  # Print the file being decompressed
-        
-        # Decompress the file without removing the original
-        gunzip(file, remove = FALSE)
-        
-        # The decompressed file will have the same name but without the .gz extension
-        decompressed_file <- sub("\\.gz$", "", file)
-        
-        # Extract sample name (e.g., H2, H4, etc.)
-        sample_name <- sub(".*_(H[0-9]+)_.*", "\\1", basename(decompressed_file))
-        
-        # Read the decompressed CSV file
-        data <- read_csv(decompressed_file)
-        
-        # Save the data as sample_name + "_cm.qs"
-        qsave(data, paste0(sample_name, "_cm.qs"))
-        
-        print(paste("Saved as:", paste0(sample_name, "_cm.qs")))
-      }
-      
-    }
-    
-    # Go manually through each of the files and turn the first column into row name
-    {
-      temp <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/H7_cm.qs")
-      count_matrix <- as.data.frame(temp)  # Ensure it's a data frame, not a tibble
-      rownames(count_matrix) <- count_matrix[, 1]  # Set the first column as row names
-      count_matrix <- count_matrix[, -1]  # Remove the first column from the data
-      head(count_matrix)
-      qsave(count_matrix, "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/H7_cm.qs")
-      
-    }
-    
-    #Creating the Seurat object
-    {
-      one_verified_cm("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/")
-      temp <- qread("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Hu/cm_hu.qs")
-      seu <- CreateSeuratObject(temp)
-      seu$sample <- seu$orig.ident
-      seu$orig.ident <- "Hu"
-      seu$condition <- "healthy"
-      qsave(seu,"/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_hu.qs")
-      
-    }
-    
-    #General pipeline
-    {  
-      seu_kang <- seu
-      seu_kang <- PercentageFeatureSet(seu_kang, "^MT-", col.name = "percent_mito")
-      
-      feats <- c("percent_mito")
-      VlnPlot(seu_kang, group.by = "orig.ident", features = feats, ncol = 1) +
-        NoLegend()
-      
-      seu_kang <- subset(seu_kang, subset = percent_mito < 20)
-      
-      
-      
-      options(future.globals.maxSize = 8 * 1024^3)  
-      
-      
-      seu_kang <- SCTransform(seu_kang, vars.to.regress = "percent_mito", verbose = TRUE, conserve.memory = TRUE)
-      qsave(seu_kang, "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_hu.qs")
-      
-      feats <- c("nFeature_SCT")
-      VlnPlot(seu_kang, group.by = "orig.ident", features = feats, ncol = 1) +
-        NoLegend()
-      
-      seu_kang <- subset(seu_kang, subset = nFeature_SCT > 500)
-      
-      qsave(seu_kang, "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_hu.qs")
-      
-      seu_kang <- CellCycleScoring(object = seu_kang, g2m.features = cc.genes$g2m.genes,
-                                   s.features = cc.genes$s.genes)
-      seu_kang <- RunPCA(seu_kang, npcs = 50, verbose = F)
-      VizDimLoadings(seu_kang, dims = 1:5, reduction = "pca", ncol = 5, balanced = T)
-      
-      ElbowPlot(seu_kang, reduction = "pca", ndims = 50)
-      
-      seu_kang <- FindNeighbors(seu_kang, dims = 1:25)
-      seu_kang <- FindClusters(seu_kang, resolution = 0.6)
-      seu_kang <- RunUMAP(seu_kang, reduction = "pca", dims = 1:25, n.components = 2, n.neighbors = 30,
-                          n.epochs = 200, min.dist = 0.3, learning.rate = 1, spread = 1)
-      
-      qsave(seu_kang, "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/seu_hu.qs")
-      
-      
-    }
-    seu <- seu_kang
-    size = 0.8
-    p_clusters <- dittoDimPlot(seu, "seurat_clusters", reduction.use = "umap", size = size) +
-      ggplot2::ggtitle(label = "UMAP by Seurat Clusters")
-    
-    p_sample <- dittoDimPlot(seu, "sample", reduction.use = "umap", size = size) +
-      ggplot2::ggtitle(label = "UMAP by sample")
-    
-    p_singler <- dittoDimPlot(seu, "orig.ident", reduction.use = "umap", size = size) +
-      ggplot2::ggtitle(label = "UMAP by orig.ident")
-    
-    p_condition <- dittoDimPlot(seu, "condition", reduction.use = "umap", size = size, opacity = 0.8) +
-      ggplot2::ggtitle(label = "UMAP by Sample")
-    
-    # Combine plots into one
-    p_final <- ((p_clusters + p_condition) / (p_singler + p_sample))
-    print(p_final)
-  }
-  
-  #  Foltz - these are bright/dim NK cells that underwent stimulation and now are adaptive NK cells.
-  # I want unstimulated cells
-  
-  #Brownlie - bulk-seq (of bright and adaptive NKS, from blood and lung), and not scRNA-seq
-  {
-    
-    download_file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE166654&format=file&file=GSE166654%5F210210%5FGEO%5Fcounts%2Etxt%2Egz",
-                  "/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Brownlie/GSE166654_210210_GEO_counts.txt.gz")
-    
-    gunzip("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Brownlie/GSE166654_210210_GEO_counts.txt.gz", remove = FALSE)
-    
-    cm <- read.delim("/bigdata/bgutman/Collabs/Dror mevorach/data/healthy_nks/Brownlie/GSE166654_210210_GEO_counts.txt", header = TRUE, sep = "\t")
-    
-    
-  }
-  
-  # Dogra - Bulk as well
-  
-}
 
-#CITE-seq for benchmark
+# 7. CITE-seq Benchmarking Datasets
 
 {
   
