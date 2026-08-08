@@ -1,4 +1,5 @@
-#In this same cell type analysis, unlike other, I did stuff more manually, because it was my first time:
+> **Overview:** This script documents the granular, exploratory development and step-by-step testing of the pairwise differential expression (PDE) pipeline. Subsequent analyses for other cell types utilize the fully automated, streamlined pipeline derived from this foundational workflow.
+
 
 # 1. Environment Setup & Reference Data Ingestion (ETL)
 ## 1.1 Generating Reference Tables for Housekeeping Genes
