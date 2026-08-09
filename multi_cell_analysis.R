@@ -1,4 +1,6 @@
-#Libs and functions
+# 1. Environment Setup & Data Loading
+## 1.1 Libraries, Custom Signatures, and Helper Functions
+
 {
   suppressPackageStartupMessages({
     library(dplyr)
@@ -84,7 +86,7 @@
   
 }
 
-#Color Platte
+## 1.2 Color Palettes
 {
   group_palette  = c(
     "Proliferation"                     = "#E9A5F1",
@@ -112,7 +114,8 @@
 }
 
 
-#Basic pipeline
+# 2. Data Preprocessing & Healthy Controls
+## 2.1 Basic Pipeline & Subsetting
 {
   
   #Create healthy list for each cell type
@@ -574,7 +577,8 @@
   
 }
 
-#Basic pipeline for neuroimmunulogical samples
+# 3. Disease Cohort Processing
+## 3.1 Neuroimmunological Samples Pipeline
 {
   #removing activated T cells from seu_cd55_patient
   {
@@ -1255,7 +1259,8 @@
 }
 
 
-#GSEA dotplot
+# 4. Pathway Analysis Visualizations
+## 4.1 GSEA Dotplots                         
 {
 
   #This is an old code, new version is at /bigdata/bgutman/Collabs/Dror mevorach/scripts/old_and_irelevant/NK_anlysis_one_on_one_manually_doing-stuff_and_old_functions.Rmd
@@ -1368,7 +1373,7 @@
 }
 
 
-#Individual cell type pathway lolipops
+## 4.2 Individual Cell Type Pathway Lollipops                         
 {
   #NKS
   {
@@ -1634,7 +1639,8 @@
   
 }
 
-#dimplot and dotplot
+# 5. Cell Type Annotation
+## 5.1 Dimplots and Dotplots                         
 {
   font_sizes <- list(
     title        = 22,   # plot titles
@@ -1761,7 +1767,8 @@
   }
 }
 
-#CD59.Def_cd8_integrated_vs_meta_scatter_plot
+# 6. Differential Expression Meta-Comparisons
+## 6.1 CD59.Def CD8+ Integrated vs Meta Scatter Plots                         
 {
   #regular version
   {
@@ -2507,7 +2514,7 @@
 }
 
 
-#Volcano, scatter and forset mega plot
+## 6.2 Volcano, Scatter, and Forest Mega Plots                         
 {
   #volcano
   {
@@ -2812,8 +2819,8 @@
   
 }
 
-# forset plot
-{
+## 6.3 Standalone Forest Plots
+                         {
   highlight_genes <- c("S100B", "TMEM2", "WASHC1")
   
   
@@ -2931,7 +2938,8 @@
 
 
   
-#Upset Plot DE genes
+# 7. Shared DEGs & Intersection Composition
+## 7.1 UpSet Plots for DE Genes                         
 {
   #create positive_gene_upset_df and negative_gene_upset_df
   {
@@ -3534,7 +3542,7 @@
   
 }
 
-#Significance Barplot of Overlap genes 
+## 7.2 Significance Barplots of Overlap Genes                         
 {
   
   #Calculate foldchange of independence
@@ -3592,7 +3600,7 @@
   
 }
 
-#Composition plots
+## 7.3 Composition Plots                         
 {
   #create positive_gene_upset_df and negative_gene_upset_df
   {
@@ -3800,7 +3808,8 @@
 
 }
 
-#ORA
+# 8. Over-Representation Analysis (ORA)
+## 8.1 ORA Pipeline & Lollipops                         
 {
 
   #ORA itself
@@ -4073,7 +4082,8 @@
 
 
 
-#pathview plots
+# 9. Pathway Network Mapping
+## 9.1 Pathview Plots                         
 {
   data("sbgn.xmls")          # SBGN-ML files for Reactome, SMPDB, PANTHER, etc.
   data("pathways.info")      # metadata for every pathway in the collection
@@ -4276,7 +4286,8 @@
 }
 
 
-#CD59 only AUC heatmaps
+# 10. AUC Scoring & Heatmaps
+## 10.1 CD59 Metabolic Panels (AUC Heatmaps)                         
 {
   #getting meta_table_list
   {
@@ -4698,7 +4709,7 @@
   
 }
 
-#AUC scores on neuroimuunulogical samples
+## 10.2 Neuroimmunological Samples AUC Scores                         
 {
   #AUC mitchondrial complexes
   {
@@ -5659,8 +5670,9 @@
 
 
 
-# Shared DEGs signatures AUC Scores
-{
+# 11. Shared DEG Signatures & Phenotypes
+## 11.1 Shared DEGs Signatures AUC Scores
+               {
   
   # creating shared_degs_signature_list
   {
@@ -6527,7 +6539,7 @@
 
 }
 
-# heatmaps of whole gene sets
+## 11.2 Heatmaps of Whole Gene Sets                 
 {
   #gene_sets_df: all genes from all gene sets (with duplicates)
   {
@@ -6766,7 +6778,7 @@
 }
 
 
-# heatmaps of effector_vs_exhuasted_cd8_t_cells whole gene sets
+## 11.3 Effector vs. Exhausted CD8 T Cells Gene Sets                 
 {
   #gene_sets_df: all genes from all gene sets (with duplicates)
   {
@@ -6925,7 +6937,7 @@
     }
 }
 
-#AUC scores of whole gene sets
+## 11.4 AUC Scores for Custom Whole Gene Sets                 
 {
   
   #get sig_list
@@ -7312,7 +7324,7 @@
   
 }
 
-#AUC scores of whole gene sets
+## 11.5 AUC Scores for CD8 Exhaustion Gene Sets                 
 {
   
   #get sig_list
