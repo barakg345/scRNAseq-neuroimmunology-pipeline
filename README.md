@@ -1,6 +1,6 @@
-# Single-Cell PBMC Analysis Pipeline
+# scRNA-Seq Neuroimmunology Analysis Pipeline
 
-Welcome to the single-cell RNA-seq analysis repository! This project contains the R-based data processing, differential expression, and visualization pipelines used to compare patient samples (e.g., CD59-deficient and other neuroimmunological conditions) against healthy controls.
+This repository houses the R processing and visualization codebase for my M.Sc. thesis, comparing single-cell PBMC profiles from neuroimmunological disease cohorts against integrated healthy controls.
 
 ## 📁 Repository Structure
 
