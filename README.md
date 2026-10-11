@@ -13,7 +13,7 @@ Here is a quick guide to what each file does. If you are a new developer or anal
 *   **`multi_cell_analysis.R`**
     The master pipeline. This large script runs integration, meta-analyses, and pathway scoring across *all* immune cell types simultaneously. It generates the big-picture outputs, such as multi-cell UpSet plots, Over-Representation Analysis (ORA) comparisons, and broad pathway AUC heatmaps.
 *   **`same_celltype-comparisons/` (Subfolder)**
-    Contains cell-type-specific R Markdown (`.Rmd`) notebooks (e.g., `B_cells_analysis.Rmd`, `NK_anlysis.Rmd`, `CD4+_T_cells_analysis.Rmd`). While `multi_cell_analysis.R` looks at the whole system, these scripts zoom in. They generate granular, publication-ready figures (like UMAPs, specific GSEA Lollipops, and targeted forest plots) isolated to a single immune cell population.
+    Contains cell-type-specific R Markdown (`.Rmd`) notebooks (e.g., `B_cells_analysis.Rmd`, `NK_analysis.Rmd`, `CD4+_T_cells_analysis.Rmd`). While `multi_cell_analysis.R` looks at the whole system, these scripts zoom in. They generate granular, publication-ready figures (like UMAPs, specific GSEA Lollipops, and targeted forest plots) isolated to a single immune cell population.
 
 ## 🧠 Jargon Buster
 
@@ -30,4 +30,4 @@ If you are coming from a traditional data science background rather than a stric
 
 1.  **Hardware Requirements**: Single-cell data is massive. Many scripts here explicitly set `future.globals.maxSize` to handle objects upwards of 100-320 GB. Ensure you are running this on an appropriately provisioned cluster or server.
 2.  **Environment Setup**: Check the top of `multi_cell_analysis.R` or the `.Rmd` files for the full list of required R libraries (e.g., `Seurat`, `ggplot2`, `ComplexHeatmap`, `qs`). 
-3.  **Paths**: The scripts currently rely on absolute paths pointing to a `/bigdata/` directory. You may need to update these paths or set up environment variables depending on your local compute cluster.
+3.  **Paths**: Scripts target cluster directories (/bigdata/); adjust base paths to match your local setup.
